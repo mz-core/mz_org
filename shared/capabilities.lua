@@ -5,6 +5,7 @@ MZOrgCapabilities = {
   -- Membros
   'members.invite',
   'members.kick',
+  'members.remove',
   'members.promote',
   'members.demote',
   'members.suspend',
@@ -39,5 +40,6 @@ MZOrgCapabilities = {
   'boss.actions',
   'manage.members',
   'manage.permissions',
-  'manage.account'
+  'manage.account',
+  'manage.goals'
 }

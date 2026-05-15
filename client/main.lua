@@ -124,6 +124,22 @@ RegisterNUICallback('members:list', function(data, cb)
   sendServerRequest('mz_org:server:listMembers', data, cb)
 end)
 
+RegisterNUICallback('members:invite', function(data, cb)
+  sendServerRequest('mz_org:server:inviteMember', data, cb)
+end)
+
+RegisterNUICallback('members:remove', function(data, cb)
+  sendServerRequest('mz_org:server:removeMember', data, cb)
+end)
+
+RegisterNUICallback('members:promote', function(data, cb)
+  sendServerRequest('mz_org:server:promoteMember', data, cb)
+end)
+
+RegisterNUICallback('members:demote', function(data, cb)
+  sendServerRequest('mz_org:server:demoteMember', data, cb)
+end)
+
 RegisterNUICallback('logs:list', function(data, cb)
   sendServerRequest('mz_org:server:listLogs', data, cb)
 end)
@@ -134,6 +150,38 @@ end)
 
 RegisterNUICallback('org-bank:transactions', function(data, cb)
   sendServerRequest('mz_org:server:listOrgBankTransactions', data, cb)
+end)
+
+RegisterNUICallback('org-bank:deposit', function(data, cb)
+  sendServerRequest('mz_org:server:depositOrgBank', data, cb)
+end)
+
+RegisterNUICallback('org-bank:withdraw', function(data, cb)
+  sendServerRequest('mz_org:server:withdrawOrgBank', data, cb)
+end)
+
+RegisterNUICallback('recruitment:list', function(data, cb)
+  sendServerRequest('mz_org:server:listRecruitment', data, cb)
+end)
+
+RegisterNUICallback('recruitment:get', function(data, cb)
+  sendServerRequest('mz_org:server:getRecruitment', data, cb)
+end)
+
+RegisterNUICallback('goals:list', function(data, cb)
+  sendServerRequest('mz_org:server:listGoals', data, cb)
+end)
+
+RegisterNUICallback('goals:get', function(data, cb)
+  sendServerRequest('mz_org:server:getGoal', data, cb)
+end)
+
+RegisterNUICallback('goals:create', function(data, cb)
+  sendServerRequest('mz_org:server:createGoal', data, cb)
+end)
+
+RegisterNUICallback('org-access:get', function(data, cb)
+  sendServerRequest('mz_org:server:getOrgAccess', data, cb)
 end)
 
 RegisterNetEvent('mz_org:client:receiveSession', function(session)

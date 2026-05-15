@@ -3,6 +3,8 @@ local function debugPrint(...)
   print('[mz_org:bank]', ...)
 end
 
+local bankActionCooldown = {}
+
 local function ok(data)
   return {
     ok = true,
@@ -61,6 +63,43 @@ local function normalizeNumber(value, fallback, minValue, maxValue)
   if minValue and value < minValue then value = minValue end
   if maxValue and value > maxValue then value = maxValue end
   return value
+end
+
+local function normalizeAmount(value)
+  value = math.floor(tonumber(value) or 0)
+  if value <= 0 then return nil end
+  return value
+end
+
+local function translateBankError(err)
+  local messages = {
+    invalid_org = 'Organizacao invalida.',
+    org_not_found = 'Organizacao nao encontrada.',
+    org_has_no_shared_account = 'Esta organizacao nao possui conta compartilhada.',
+    invalid_amount = 'Valor invalido.',
+    invalid_reason = 'Motivo invalido.',
+    player_not_loaded = 'Player nao carregado.',
+    insufficient_player_funds = 'Saldo insuficiente na sua conta bancaria.',
+    insufficient_org_funds = 'Saldo insuficiente na conta da organizacao.',
+    forbidden = 'Sem permissao para esta operacao.',
+    deposit_failed = 'Nao foi possivel depositar.',
+    withdraw_failed = 'Nao foi possivel sacar.',
+    transaction_failed = 'Nao foi possivel registrar a transacao.',
+    rate_limited = 'Aguarde alguns segundos para tentar novamente.'
+  }
+
+  return messages[tostring(err or '')] or 'Nao foi possivel concluir a operacao.'
+end
+
+local function checkBankActionRateLimit(src)
+  local now = os.time()
+  local last = bankActionCooldown[src] or 0
+  if now - last < 2 then
+    return false
+  end
+
+  bankActionCooldown[src] = now
+  return true
 end
 
 local function normalizeTransactionFilters(payload)
@@ -127,17 +166,87 @@ RegisterNetEvent('mz_org:server:listOrgBankTransactions', function(requestId, pa
 
   -- Ainda nao existe tabela/export dedicado de extrato no mz_core.
   -- Mantemos a consulta read-only com fallback vazio seguro.
-  local rows, err = safeExport('mz_core', 'ListOrgAccountTransactions', src, orgCode, normalizeTransactionFilters(payload))
-  if rows == false then
-    sendResponse(src, requestId, fail(err == 'forbidden' and 'Sem permissao para visualizar extrato.' or 'Nao foi possivel listar extrato.'))
+  local okResult, result = safeExport('mz_core', 'ListOrgAccountTransactions', src, orgCode, normalizeTransactionFilters(payload))
+  if okResult == false then
+    sendResponse(src, requestId, fail(translateBankError(result)))
     return
   end
 
-  if type(rows) ~= 'table' then
+  if type(result) ~= 'table' then
     debugPrint('ListOrgAccountTransactions indisponivel no mz_core; retornando extrato vazio seguro.')
     sendResponse(src, requestId, ok({}))
     return
   end
 
-  sendResponse(src, requestId, ok(rows))
+  sendResponse(src, requestId, ok(result))
+end)
+
+RegisterNetEvent('mz_org:server:depositOrgBank', function(requestId, payload)
+  local src = source
+  payload = type(payload) == 'table' and payload or {}
+  local orgCode = normalizeString(payload.orgCode, 48)
+  local amount = normalizeAmount(payload.amount)
+  local reason = normalizeString(payload.reason, 255)
+
+  if not checkBankActionRateLimit(src) then
+    sendResponse(src, requestId, fail(translateBankError('rate_limited')))
+    return
+  end
+
+  if not orgCode then
+    sendResponse(src, requestId, fail(translateBankError('invalid_org')))
+    return
+  end
+
+  if not amount then
+    sendResponse(src, requestId, fail(translateBankError('invalid_amount')))
+    return
+  end
+
+  local okResult, result = safeExport('mz_core', 'DepositOrgAccount', src, orgCode, amount, reason)
+  if okResult == false then
+    sendResponse(src, requestId, fail(translateBankError(result)))
+    return
+  end
+  if okResult ~= true then
+    sendResponse(src, requestId, fail(translateBankError('deposit_failed')))
+    return
+  end
+
+  sendResponse(src, requestId, ok(result or {}))
+end)
+
+RegisterNetEvent('mz_org:server:withdrawOrgBank', function(requestId, payload)
+  local src = source
+  payload = type(payload) == 'table' and payload or {}
+  local orgCode = normalizeString(payload.orgCode, 48)
+  local amount = normalizeAmount(payload.amount)
+  local reason = normalizeString(payload.reason, 255)
+
+  if not checkBankActionRateLimit(src) then
+    sendResponse(src, requestId, fail(translateBankError('rate_limited')))
+    return
+  end
+
+  if not orgCode then
+    sendResponse(src, requestId, fail(translateBankError('invalid_org')))
+    return
+  end
+
+  if not amount then
+    sendResponse(src, requestId, fail(translateBankError('invalid_amount')))
+    return
+  end
+
+  local okResult, result = safeExport('mz_core', 'WithdrawOrgAccount', src, orgCode, amount, reason)
+  if okResult == false then
+    sendResponse(src, requestId, fail(translateBankError(result)))
+    return
+  end
+  if okResult ~= true then
+    sendResponse(src, requestId, fail(translateBankError('withdraw_failed')))
+    return
+  end
+
+  sendResponse(src, requestId, ok(result or {}))
 end)

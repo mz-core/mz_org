@@ -38,6 +38,8 @@ files {
   'web/index.html',
   'web/style.css',
   'web/script.js',
+  'web/core/**/*.js',
+  'web/services/**/*.js',
   'web/panels/**/*.js',
   'web/assets/**/*'
 }

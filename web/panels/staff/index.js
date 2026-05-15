@@ -1,8 +1,15 @@
-window.MZ_PANEL_DEFINITIONS = window.MZ_PANEL_DEFINITIONS || {};
-window.MZ_PANEL_DEFINITIONS.staff = {
-  id: 'staff',
-  title: 'Staff',
-  subtitle: 'Ferramentas administrativas read-only e auditoria.',
-  initialModule: 'staff',
-  modules: ['staff', 'orgs', 'logs', 'settings']
-};
+(function () {
+  'use strict';
+
+  window.MZOrgPanels = window.MZOrgPanels || {};
+  window.MZOrgPanels.staff = {
+    id: 'staff',
+    title: 'Staff',
+    subtitle: 'Consulta administrativa, orgs e auditoria.',
+    initialModule: 'staff',
+    modules: ['staff', 'orgs', 'logs', 'settings'],
+    render: function () {
+      return window.MZOrgRouter.renderStaffPage();
+    }
+  };
+}());

@@ -1,8 +1,15 @@
-window.MZ_PANEL_DEFINITIONS = window.MZ_PANEL_DEFINITIONS || {};
-window.MZ_PANEL_DEFINITIONS.hub = {
-  id: 'hub',
-  title: 'Painel Geral',
-  subtitle: 'Entrada contextual para os módulos liberados.',
-  initialModule: 'dashboard',
-  modules: ['dashboard', 'legal', 'gang', 'staff', 'vip', 'business', 'government', 'event', 'orgs', 'logs', 'settings']
-};
+(function () {
+  'use strict';
+
+  window.MZOrgPanels = window.MZOrgPanels || {};
+  window.MZOrgPanels.hub = {
+    id: 'hub',
+    title: 'Painel Geral',
+    subtitle: 'Portal dos paineis liberados para seu personagem.',
+    initialModule: 'dashboard',
+    modules: ['dashboard', 'recruitment', 'goals', 'legal', 'gang', 'staff', 'vip', 'business', 'government', 'event', 'orgs', 'logs', 'settings'],
+    render: function () {
+      return window.MZOrgRouter.renderDashboard();
+    }
+  };
+}());
