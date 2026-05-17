@@ -359,4 +359,4 @@ Implementado no frontend para os contextos iniciais:
 Ainda pendente:
 
 - Replicar a estrutura de abas para VIP, empresa, governo e eventos.
-- Refinar uma navegacao interna propria para Staff/admin.
+- Staff/admin ja possui dashboard read-only com abas internas; a proxima etapa e consulta detalhada de org sem acoes perigosas.

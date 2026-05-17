@@ -9,6 +9,8 @@ O `mz_org` é interface NUI. O `mz_core` é a fonte real de dados, permissões, 
 - O frontend não envia `isOwner`, `source`, `permissions` ou `capabilities` como verdade.
 - Ações futuras sempre devem chamar validação no server antes de executar.
 
+O MVP oculta detalhes tecnicos brutos na UI normal; CitizenID deve aparecer mascarado em listas.
+
 ## Capabilities revisadas
 
 Catalogo oficial usado pelo `mz_org`/`mz_core`:
@@ -19,7 +21,7 @@ Catalogo oficial usado pelo `mz_org`/`mz_core`:
 - Metas: `goals.view`, `goals.manage`.
 - Recrutamento: `recruitment.view`, `recruitment.manage`.
 - Logs: `logs.view`.
-- Staff/admin: `staff.panel.open`, `staff.orgs.view`, `staff.orgs.manage`, `staff.orgs.set_leader`, `staff.members.invite`, `staff.members.remove`, `staff.members.promote`, `staff.members.demote`, `staff.staff.manage`, `staff.logs.view`.
+- Staff/admin: `staff.panel.open`, `staff.orgs.view`, `staff.orgs.manage`, `staff.orgs.create`, `staff.orgs.set_leader`, `staff.members.invite`, `staff.members.remove`, `staff.members.promote`, `staff.members.demote`, `staff.staff.manage`, `staff.logs.view`.
 
 Aliases legados mantidos por compatibilidade:
 
@@ -42,6 +44,7 @@ Regras importantes:
 - `CanOrg(source, orgCode, capability)`
 - `ListOrgs()`
 - `GetOrgByCode(orgCode)`
+- `CreateOrgFromTemplate(source, payload)`
 - `ListOrgMembers(source, orgCode)`
 - `ListLogs(source, filters)`
 - `GetOrgAccount(source, orgCode)`
@@ -107,6 +110,7 @@ Todos retornam:
 - `session:get`
 - `orgs:list`
 - `orgs:get`
+- `orgs:createFromTemplate`
 - `members:list`
 - `logs:list`
 - `org-bank:get`
@@ -129,7 +133,78 @@ Todos retornam:
 - `members:demote`
 - `members:setLeader`
 
-### Staff minimo: definir lider
+### Staff dashboard, criar org e definir lider
+
+`/staff` possui um dashboard seguro/read-only com abas internas:
+
+- `Visao geral`: metricas e resumo sem atalhos duplicados.
+- `Organizacoes`: usa `orgs:list`, pode abrir `Ver detalhes` read-only e pode abrir o modal `Criar organizacao` para owner/`staff.orgs.create`.
+- `Logs`: usa `logs:list`.
+- `Auditoria`: filtra localmente eventos sensiveis dentro dos logs recentes.
+- `Acoes administrativas`: mantem apenas a action real `Definir lider` e mostra cards bloqueados para fases futuras.
+
+O dashboard reutiliza services existentes para leitura. A unica nova escrita desta fase e `orgs:createFromTemplate`, restrita a templates server-side. Nao ha CRUD global livre de orgs, gestao de staff, editor de cargos/permissoes, exclusao de org ou acoes financeiras globais.
+
+#### Criar organizacao por template
+
+Callback NUI:
+
+```lua
+orgs:createFromTemplate {
+  type = "gang",
+  code = "mafia_norte",
+  name = "Mafia Norte",
+  hasSalary = false,
+  hasSharedAccount = true,
+  hasStorage = true,
+  reason = "opcional"
+}
+```
+
+Export usado:
+
+```lua
+exports['mz_core']:CreateOrgFromTemplate(source, payload)
+```
+
+Regras:
+
+- exige owner ACE `group.mz_owner` ou capability `staff.orgs.create`;
+- `staff.panel.open`, `staff.orgs.view` e `staff.orgs.manage` sozinhos nao criam org;
+- tipos permitidos: `job`, `gang`, `business`, `government`, `vip`, `event`;
+- `staff` nao e criado nesta fase;
+- a NUI nao envia grades nem permissoes;
+- o core normaliza `code`, valida duplicidade, escolhe template server-side, cria org, grades padrao, permissoes padrao e conta compartilhada quando aplicavel;
+- logs: `org.create` e `org.create.blocked`.
+
+`staff.orgs.view` agora tambem permite abrir o modulo Staff para consulta. Isso nao concede escrita: criar org exige `staff.orgs.create` e definir lider exige `staff.orgs.set_leader`.
+
+As abas do Staff sao read-only, exceto `Criar organizacao` por template e `Definir lider`. Cards bloqueados nao disparam callback.
+
+#### Detalhes da organizacao no Staff
+
+`/staff > Organizacoes > Ver detalhes` nao cria callback agregado novo. A subview reaproveita callbacks existentes de leitura por `orgCode`:
+
+- `orgs:get`
+- `org-access:get`
+- `members:list`
+- `org-bank:get`
+- `org-bank:transactions`
+- `goals:list`
+- `recruitment:list`
+- `logs:list`
+
+Permissoes de consulta aceitas para essa visao:
+
+- owner ACE `group.mz_owner`;
+- `staff.orgs.view`;
+- `staff.orgs.manage`;
+- `staff.orgs.create`;
+- `staff.orgs.set_leader`.
+
+A visao e read-only e mostra resumo, cargos, membros, banco, metas, recrutamento e logs recentes sem expor payload tecnico bruto. CitizenID aparece mascarado em listas.
+
+#### Definir lider
 
 Callback NUI:
 
@@ -159,7 +234,7 @@ Regras:
 - funciona com alvo offline se o `citizenid` existir em `mz_players`;
 - exige owner ACE `group.mz_owner` ou `staff.orgs.set_leader`;
 - `staff.panel.open`, `staff.orgs.view` e `staff.orgs.manage` sem `staff.orgs.set_leader` nao autorizam a acao;
-- esta fase adiciona apenas um card manual no `/staff`, nao um painel staff global completo.
+- esta fase mantem apenas essa action real no `/staff`; o restante do dashboard e read-only ou bloqueado para fase futura.
 
 Erros esperados:
 

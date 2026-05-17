@@ -120,6 +120,10 @@ RegisterNUICallback('orgs:get', function(data, cb)
   sendServerRequest('mz_org:server:getOrg', data, cb)
 end)
 
+RegisterNUICallback('orgs:createFromTemplate', function(data, cb)
+  sendServerRequest('mz_org:server:createOrgFromTemplate', data, cb)
+end)
+
 RegisterNUICallback('members:list', function(data, cb)
   sendServerRequest('mz_org:server:listMembers', data, cb)
 end)

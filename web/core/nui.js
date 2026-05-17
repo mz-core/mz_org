@@ -117,7 +117,7 @@
     if (eventName === 'session:get') {
       window.setTimeout(function () {
         receiveSession({
-          user: { source: 1, name: 'Dev User', citizenid: 'DEV12345', isOwner: true, globalPermissions: ['group.mz_owner', 'staff.orgs.set_leader'] },
+          user: { source: 1, name: 'Dev User', citizenid: 'DEV12345', isOwner: true, globalPermissions: ['group.mz_owner', 'staff.orgs.set_leader', 'staff.orgs.create'] },
           orgs: [
             { code: 'police', name: 'Policia', type: 'legal', grade: 3, gradeCode: 'sargento', gradeName: 'Sargento', capabilities: ['org.view', 'account.view', 'logs.view', 'goals.manage'] },
             { code: 'mafia', name: 'Mafia', type: 'gang', grade: 4, gradeCode: 'lider', gradeName: 'Lider', capabilities: ['org.view', 'account.view', 'logs.view'] }
@@ -130,6 +130,7 @@
 
     if (eventName === 'orgs:list') return Promise.resolve({ ok: true, data: [] });
     if (eventName === 'orgs:get') return Promise.resolve({ ok: true, data: {} });
+    if (eventName === 'orgs:createFromTemplate') return Promise.resolve({ ok: true, data: { org: { code: payload.code, name: payload.name, type: payload.type }, template: payload.type } });
     if (eventName === 'members:list') return Promise.resolve({ ok: true, data: [] });
     if (eventName === 'members:invite') return Promise.resolve({ ok: true, data: { orgCode: payload.orgCode, targetCitizenId: payload.citizenid, grade: payload.gradeLevel || 1, gradeCode: payload.gradeCode || 'recruta' } });
     if (eventName === 'members:remove') return Promise.resolve({ ok: true, data: { orgCode: payload.orgCode, targetCitizenId: payload.citizenid, removed: true } });

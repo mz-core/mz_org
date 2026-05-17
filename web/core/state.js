@@ -78,6 +78,8 @@
       gradeCitizenId: null,
       gradeMessage: null,
       gradeError: null,
+      confirmAction: null,
+      confirmCitizenId: null,
       loadedKey: ''
     },
     logs: { loading: false, loaded: false, loadedKey: '', error: null, data: [], filters: { category: 'all', severity: 'all', org: 'all', search: '' } },
@@ -88,6 +90,8 @@
     bankModal: { open: false, type: null, amount: '', reason: '', loading: false, error: null },
     memberModal: { open: false, citizenid: '', gradeLevel: '', gradeCode: '', loading: false, error: null },
     staffLeader: { orgCode: '', citizenid: '', reason: '', loading: false, message: null, error: null },
+    staffCreateOrg: { open: false, type: 'gang', code: '', name: '', hasSalary: false, hasSharedAccount: true, hasStorage: true, reason: '', loading: false, message: null, error: null },
+    staffOrgDetails: { open: false, orgCode: null, activeTab: 'summary', loading: false, error: null, data: null },
     cache: { orgs: null, logs: null, bank: {}, accessByOrg: {} },
     sidebarCollapsed: false
   };
@@ -138,6 +142,8 @@
     state.orgView.gradeCitizenId = null;
     state.orgView.gradeMessage = null;
     state.orgView.gradeError = null;
+    state.orgView.confirmAction = null;
+    state.orgView.confirmCitizenId = null;
     state.orgView.detailError = null;
     state.orgView.membersError = null;
     state.orgView.bankError = null;

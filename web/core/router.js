@@ -59,6 +59,47 @@
     { id: 'logs', label: 'Logs' }
   ];
 
+  var staffSections = [
+    { id: 'overview', label: 'Visao geral' },
+    { id: 'orgs', label: 'Organizacoes' },
+    { id: 'logs', label: 'Logs' },
+    { id: 'audit', label: 'Auditoria' },
+    { id: 'actions', label: 'Acoes administrativas' }
+  ];
+
+  var staffOrgCreateTypes = [
+    { id: 'job', label: 'Organizacao/Job' },
+    { id: 'gang', label: 'Gang/Faccao' },
+    { id: 'business', label: 'Empresa' },
+    { id: 'government', label: 'Governo' },
+    { id: 'vip', label: 'VIP' },
+    { id: 'event', label: 'Evento' }
+  ];
+
+  var staffOrgDetailTabs = [
+    { id: 'summary', label: 'Resumo' },
+    { id: 'grades', label: 'Cargos' },
+    { id: 'members', label: 'Membros' },
+    { id: 'bank', label: 'Banco' },
+    { id: 'goals', label: 'Metas' },
+    { id: 'recruitment', label: 'Recrutamento' },
+    { id: 'logs', label: 'Logs' }
+  ];
+
+  var sensitiveAuditActions = [
+    'org.member.set_leader',
+    'org.create',
+    'org.member.invite',
+    'org.member.remove',
+    'org.member.promote',
+    'org.member.demote',
+    'org.account.deposit',
+    'org.account.withdraw',
+    'org.recruitment.approve',
+    'org.recruitment.reject',
+    'org.goal.create'
+  ];
+
   function moduleForShell(shell) {
     return shellModules[shell] || 'dashboard';
   }
@@ -240,6 +281,10 @@
       if (current.activeSection === 'logs') loadLogs({ orgCode: selectedOrgCode() });
       return;
     }
+    if (current.activeShell === 'staff') {
+      loadStaffDashboardData();
+      return;
+    }
     if (current.activeModule === 'orgs') loadOrgs();
     if (isOrgPanelModule(current.activeModule)) loadOrgPanel();
     if (current.activeModule === 'logs') loadLogs();
@@ -385,6 +430,26 @@
       current.logs.loading = false;
       render();
     });
+  }
+
+  function canLoadStaffGlobalLogs() {
+    var current = state();
+    return perms().isOwner(current.session)
+      || perms().hasGlobalPermission(current.session, 'staff.logs.view')
+      || perms().hasGlobalPermission(current.session, 'staff.orgs.manage');
+  }
+
+  function loadStaffDashboardData() {
+    loadOrgs();
+    if (canLoadStaffGlobalLogs()) {
+      loadLogs({ limit: 100 });
+    } else {
+      state().logs.loaded = true;
+      state().logs.loadedKey = 'global';
+      state().logs.loading = false;
+      state().logs.error = null;
+      state().logs.data = [];
+    }
   }
 
   function loadRecruitment() {
@@ -644,8 +709,8 @@
   }
 
   function renderOrgTable(items) {
-    return '<div class="table-scroll"><table><thead><tr><th>Nome</th><th>Tipo</th><th>Cargo</th><th>Status</th><th>Avancado</th></tr></thead><tbody>' + items.map(function (org) {
-      return '<tr><td class="cell-strong">' + ui().safeText(org.name || org.code) + '</td><td>' + ui().badge(fmt().formatOrgType(org.type || 'legal'), org.type === 'gang' ? 'danger' : 'info') + '</td><td>' + ui().safeText(fmt().formatGradeName(org)) + '</td><td>' + ui().badge(org.is_public ? 'Publica' : 'Privada', org.is_public ? 'success' : 'muted') + '</td><td>' + ui().technicalDetails('Detalhes', [{ label: 'Codigo', value: org.code }, { label: 'Tipo tecnico', value: org.type }]) + '</td></tr>';
+    return '<div class="table-scroll"><table><thead><tr><th>Nome</th><th>Tipo</th><th>Cargo</th><th>Status</th></tr></thead><tbody>' + items.map(function (org) {
+      return '<tr><td class="cell-strong">' + ui().safeText(org.name || org.code) + '</td><td>' + ui().badge(fmt().formatOrgType(org.type || 'legal'), org.type === 'gang' ? 'danger' : 'info') + '</td><td>' + ui().safeText(fmt().formatGradeName(org)) + '</td><td>' + ui().badge(org.is_public ? 'Publica' : 'Privada', org.is_public ? 'success' : 'muted') + '</td></tr>';
     }).join('') + '</tbody></table></div>';
   }
 
@@ -837,14 +902,14 @@
     if (current.orgView.detailLoading) return ui().card('Resumo', 'Informacoes principais da organizacao.', ui().loading('Carregando org'));
     if (current.orgView.detailError) return ui().card('Resumo', 'Informacoes principais da organizacao.', ui().errorBox(current.orgView.detailError));
     var org = currentOrgDetail(contextOrg);
-    return ui().card('Resumo', 'O que importa para operar a organizacao.', '<div class="detail-grid"><span>Nome</span><strong>' + ui().safeText(org.name) + '</strong><span>Tipo</span><strong>' + ui().safeText(fmt().formatOrgType(org.type)) + '</strong><span>Status</span><strong>' + ui().safeText(org.is_public ? 'Publica' : 'Privada') + '</strong></div>' + ui().technicalDetails('Detalhes tecnicos', [{ label: 'Codigo da org', value: org.code }, { label: 'Tipo interno', value: org.type }, { label: 'ID interno', value: org.id }]));
+    return ui().card('Resumo', 'O que importa para operar a organizacao.', '<div class="detail-grid"><span>Nome</span><strong>' + ui().safeText(org.name) + '</strong><span>Tipo</span><strong>' + ui().safeText(fmt().formatOrgType(org.type)) + '</strong><span>Status</span><strong>' + ui().safeText(org.is_public ? 'Publica' : 'Privada') + '</strong></div>');
   }
 
   function renderOrgAccess(org) {
     org = org || {};
     var detail = state().orgView.detail || {};
     var caps = Array.isArray(detail.capabilities) && detail.capabilities.length ? detail.capabilities : (org.capabilities || []);
-    return ui().card('Meu acesso', 'Cargo, permissoes e acoes disponiveis.', '<div class="detail-grid"><span>Cargo</span><strong>' + ui().safeText(fmt().formatGradeName(org)) + '</strong><span>Permissoes</span><strong>' + ui().safeText(caps.length) + '</strong></div>' + capabilityBadges(caps, 8) + ui().technicalDetails('Detalhes tecnicos', [{ label: 'Codigo do cargo', value: org.gradeCode }, { label: 'Nivel', value: org.grade }, { label: 'Capabilities cruas', value: caps.join(', ') }]));
+    return ui().card('Meu acesso', 'Cargo, permissoes e acoes disponiveis.', '<div class="detail-grid"><span>Cargo</span><strong>' + ui().safeText(fmt().formatGradeName(org)) + '</strong><span>Permissoes</span><strong>' + ui().safeText(caps.length) + '</strong></div>' + capabilityBadges(caps, 8));
   }
 
   function renderAccessModelCard() {
@@ -862,19 +927,19 @@
 
     var gradesBody = grades.length ? renderGradesTable(grades) : ui().empty('Nenhum cargo retornado', 'O core nao retornou grades para esta organizacao.');
     var overrides = Array.isArray(model.playerOverrides) && model.playerOverrides.length
-      ? '<div class="badge-row">' + model.playerOverrides.map(function (override) { return ui().permissionBadge(override.permission || '-', override.allow === false ? 'danger' : 'info'); }).join('') + '</div>' + ui().technicalDetails('Overrides tecnicos', model.playerOverrides.map(function (override) { return { label: override.allow === false ? 'Negado' : 'Permitido', value: override.permission || '-' }; }))
+      ? '<div class="badge-row">' + model.playerOverrides.map(function (override) { return ui().permissionBadge(override.permission || '-', override.allow === false ? 'danger' : 'info'); }).join('') + '</div>'
       : ui().empty('Sem ajustes individuais', 'Nenhuma permissao individual foi retornada para sua sessao.');
 
     return ui().card('Cargos e permissoes', 'Hierarquia, salario e permissoes em linguagem de uso.', '<div class="access-section"><h4>Permissoes base</h4>' + base + '</div><div class="access-section"><h4>Hierarquia</h4>' + gradesBody + '</div><div class="access-section"><h4>Ajustes da sua sessao</h4>' + overrides + '</div>');
   }
 
   function renderGradesTable(grades) {
-    return '<div class="table-scroll"><table><thead><tr><th>Nivel</th><th>Cargo</th><th>Salario</th><th>Heranca</th><th>Permissoes</th><th>Avancado</th></tr></thead><tbody>' + grades.map(function (grade) {
+    return '<div class="table-scroll"><table><thead><tr><th>Nivel</th><th>Cargo</th><th>Salario</th><th>Heranca</th><th>Permissoes</th></tr></thead><tbody>' + grades.map(function (grade) {
       var caps = Array.isArray(grade.capabilities) && grade.capabilities.length
         ? capabilityBadges(grade.capabilities, 5)
         : ui().safeText('-');
       var inheritance = grade.inheritsLevel ? 'Herda do nivel ' + grade.inheritsLevel : 'Sem heranca';
-      return '<tr><td>' + ui().badge('Nivel ' + grade.level, 'info') + '</td><td class="cell-strong">' + ui().safeText(grade.name || grade.code) + '</td><td>' + ui().safeText(fmt().formatMoney(grade.salary || 0)) + '</td><td>' + ui().safeText(inheritance) + '</td><td>' + caps + '</td><td>' + ui().technicalDetails('Tecnico', [{ label: 'Codigo', value: grade.code }, { label: 'Herda codigo', value: grade.inheritsCode }, { label: 'Capabilities cruas', value: (grade.capabilities || []).join(', ') }]) + '</td></tr>';
+      return '<tr><td>' + ui().badge('Nivel ' + grade.level, 'info') + '</td><td class="cell-strong">' + ui().safeText(grade.name || grade.code) + '</td><td>' + ui().safeText(fmt().formatMoney(grade.salary || 0)) + '</td><td>' + ui().safeText(inheritance) + '</td><td>' + caps + '</td></tr>';
     }).join('') + '</tbody></table></div>';
   }
 
@@ -1451,7 +1516,7 @@
       return;
     }
 
-    if (!window.confirm('Remover este membro da organizacao?')) return;
+    if (!confirmMemberInline('remove', citizenid, 'Clique novamente em Remover para confirmar esta acao.')) return;
 
     current.orgView.removeLoading = true;
     current.orgView.removeCitizenId = citizenid;
@@ -1459,6 +1524,7 @@
 
     window.MZOrgMemberService.removeMember(code, citizenid).then(function () {
       current.orgView.removeMessage = 'Membro removido da organizacao.';
+      clearMemberInlineConfirm();
       return reloadMembers(code);
     }).catch(function (err) {
       current.orgView.removeError = formatMemberActionError(err.message, 'Nao foi possivel remover membro.');
@@ -1498,8 +1564,10 @@
       return;
     }
 
-    var confirmMessage = action === 'demote' ? 'Rebaixar este membro?' : 'Promover este membro?';
-    if (!window.confirm(confirmMessage)) return;
+    var confirmMessage = action === 'demote'
+      ? 'Clique novamente em Rebaixar para confirmar esta acao.'
+      : 'Clique novamente em Promover para confirmar esta acao.';
+    if (!confirmMemberInline(action, citizenid, confirmMessage)) return;
 
     current.orgView.gradeLoading = true;
     current.orgView.gradeAction = action;
@@ -1514,6 +1582,7 @@
       current.orgView.gradeMessage = action === 'demote'
         ? 'Membro rebaixado para ' + (data.newGradeCode || data.newGrade || 'cargo anterior') + '.'
         : 'Membro promovido para ' + (data.newGradeCode || data.newGrade || 'proximo cargo') + '.';
+      clearMemberInlineConfirm();
       return reloadMembers(code);
     }).catch(function (err) {
       current.orgView.gradeError = formatMemberActionError(err.message, 'Nao foi possivel alterar cargo.');
@@ -1523,6 +1592,31 @@
       current.orgView.gradeCitizenId = null;
       render();
     });
+  }
+
+  function confirmMemberInline(action, citizenid, message) {
+    var current = state();
+    var confirmed = current.orgView.confirmAction === action && current.orgView.confirmCitizenId === citizenid;
+    if (confirmed) return true;
+
+    current.orgView.confirmAction = action;
+    current.orgView.confirmCitizenId = citizenid;
+
+    if (action === 'remove') {
+      current.orgView.removeMessage = message;
+      current.orgView.removeError = null;
+    } else {
+      current.orgView.gradeMessage = message;
+      current.orgView.gradeError = null;
+    }
+
+    render();
+    return false;
+  }
+
+  function clearMemberInlineConfirm() {
+    state().orgView.confirmAction = null;
+    state().orgView.confirmCitizenId = null;
   }
 
   function reloadMembers(orgCode) {
@@ -1542,18 +1636,617 @@
 
   function renderStaffPage() {
     if (!perms().canViewModule(state().session, 'staff')) return '<div class="screen">' + ui().errorBox('Sem permissao para visualizar staff.') + '</div>';
+    var current = state();
+    var section = current.activeSection || 'overview';
+
+    return '<div class="screen">' +
+      '<div class="page-heading staff-heading"><div><span class="module-kicker">Staff</span><h2>Administracao</h2><p>Dashboard seguro para consulta e auditoria. Escritas restritas ficam isoladas em acoes administrativas.</p></div>' + ui().badge(perms().getAccessLabel(), perms().getAccessVariant()) + '</div>' +
+      renderStaffMetrics() +
+      renderStaffTabs(section) +
+      '<section class="staff-section">' + renderStaffSection(section) + '</section>' +
+    '</div>';
+  }
+
+  function renderStaffMetrics() {
+    var current = state();
+    var orgCount = current.orgs.loaded ? current.orgs.data.length : (current.orgs.loading ? '...' : '-');
+    var memberTotal = staffMemberTotal();
+    var logCount = current.logs.loaded ? current.logs.data.length : (current.logs.loading ? '...' : '-');
+    var availableActions = (canShowStaffLeaderCard() ? 1 : 0) + (canCreateStaffOrg() ? 1 : 0);
+    var actionCount = availableActions + (availableActions === 1 ? ' disponivel' : ' disponiveis');
+
+    return '<div class="staff-grid">' +
+      renderStaffMetric('assets/icons/orgs.svg', orgCount, 'Organizacoes', current.orgs.loading ? 'Carregando consulta' : 'Visiveis para sua sessao', 'O') +
+      renderStaffMetric('assets/icons/staff.svg', memberTotal == null ? '-' : memberTotal, 'Membros', memberTotal == null ? 'Nao carregado sem callback dedicado' : 'Total informado pelas orgs', 'M') +
+      renderStaffMetric('assets/icons/logs.svg', logCount, 'Logs recentes', current.logs.loading ? 'Carregando auditoria' : 'Retornados pelo servidor', 'L') +
+      renderStaffMetric('assets/icons/lock.svg', actionCount, 'Acoes sensiveis', 'Demais acoes permanecem bloqueadas', 'A') +
+    '</div>';
+  }
+
+  function renderStaffMetric(icon, value, title, description, fallback) {
+    return '<div class="staff-metric-card">' +
+      ui().renderIcon(icon, fallback || '*', 'metric-icon') +
+      '<strong>' + ui().safeText(value) + '</strong>' +
+      '<span>' + ui().safeText(title) + '</span>' +
+      '<small>' + ui().safeText(description) + '</small>' +
+    '</div>';
+  }
+
+  function staffMemberTotal() {
+    var orgs = state().orgs.data || [];
+    var total = 0;
+    var hasValue = false;
+    orgs.forEach(function (org) {
+      var count = Number(org.memberCount);
+      if (Number.isFinite(count)) {
+        total += count;
+        hasValue = true;
+      }
+    });
+    return hasValue ? total : null;
+  }
+
+  function renderStaffTabs(active) {
+    return '<nav class="staff-tabs" aria-label="Secoes staff">' + staffSections.map(function (section) {
+      return '<button class="staff-tab' + (section.id === active ? ' is-active' : '') + '" data-section="' + ui().escapeHtml(section.id) + '">' + ui().safeText(section.label) + '</button>';
+    }).join('') + '</nav>';
+  }
+
+  function renderStaffSection(section) {
+    if (section === 'orgs') return renderStaffOrgsSection();
+    if (section === 'logs') return renderStaffLogsSection();
+    if (section === 'audit') return renderStaffAuditSection();
+    if (section === 'actions') return renderStaffActionsSection();
+    return renderStaffOverviewSection();
+  }
+
+  function renderStaffOverviewSection() {
+    var recentLogs = (state().logs.data || []).slice(0, 5);
+    var auditLogs = sensitiveStaffLogs().slice(0, 5);
+
+    return '<div class="two-col">' +
+      ui().card('Resumo administrativo', 'Consulta separada do contexto pessoal de /org e /gang.', '<div class="data-list">' +
+        '<div><span>Modo</span><strong>Administrativo</strong></div>' +
+        '<div><span>Permissao</span><strong>' + ui().safeText(perms().getAccessLabel()) + '</strong></div>' +
+        '<div><span>Acoes reais liberadas</span><strong>' + ui().safeText([canCreateStaffOrg() ? 'Criar org' : null, canShowStaffLeaderCard() ? 'Definir lider' : null].filter(Boolean).join(', ') || 'Nenhuma') + '</strong></div>' +
+        '<div><span>Criacao por template</span><strong>' + ui().safeText(canCreateStaffOrg() ? 'Disponivel' : 'Bloqueada') + '</strong></div>' +
+      '</div>') +
+      ui().card('Navegacao', 'Use as abas internas para consultar orgs, logs, auditoria e acoes administrativas.', '<p class="soft-note">Os atalhos duplicados foram compactados; as abas acima sao a navegacao principal do Staff.</p>') +
+      ui().card('Ultimos logs', 'Resumo sem payload tecnico bruto.', renderStaffLogList(recentLogs, 'Nenhum log recente retornado.')) +
+      ui().card('Eventos sensiveis', 'Recorte local dos logs recentes.', renderStaffLogList(auditLogs, 'Nenhum evento sensivel recente encontrado.')) +
+    '</div>';
+  }
+
+  function renderStaffOrgsSection() {
+    var current = state();
+    if (current.staffOrgDetails && current.staffOrgDetails.open) {
+      return renderStaffOrgDetailView() + renderStaffCreateOrgModal();
+    }
+
+    var body = current.orgs.loading
+      ? ui().loading('Carregando organizacoes')
+      : current.orgs.error
+        ? ui().errorBox(current.orgs.error)
+        : !current.orgs.data.length
+          ? ui().empty('Nenhuma organizacao visivel', 'O servidor nao retornou orgs para esta sessao.')
+          : renderStaffOrgList(current.orgs.data);
+
+    return renderStaffCreateOrgPanel() +
+      ui().card('Organizacoes', 'Consulta read-only das orgs retornadas para sua sessao.', body, 'staff-list-card') +
+      renderStaffCreateOrgModal();
+  }
+
+  function renderStaffOrgList(items) {
+    return '<div class="staff-org-list"><table><thead><tr><th>Organizacao</th><th>Tipo</th><th>Membros</th><th>Status</th><th>Detalhes</th></tr></thead><tbody>' + items.map(function (org) {
+      var members = Number.isFinite(Number(org.memberCount)) ? org.memberCount : '-';
+      return '<tr><td class="cell-strong">' + ui().safeText(org.name || org.code) + '<span class="cell-subtitle">' + ui().safeText(org.code || '-') + '</span></td><td>' + ui().badge(fmt().formatOrgType(org.type || 'legal'), staffOrgVariant(org.type)) + '</td><td>' + ui().safeText(members) + '</td><td>' + ui().badge(org.locked ? 'Bloqueada' : (org.is_public ? 'Publica' : 'Privada'), org.locked ? 'warning' : 'muted') + '</td><td><button class="btn btn-ghost" data-action="staff-view-org-details" data-org-code="' + ui().escapeHtml(org.code || '') + '">Ver detalhes</button></td></tr>';
+    }).join('') + '</tbody></table></div>';
+  }
+
+  function findStaffOrgByCode(code) {
+    return (state().orgs.data || []).filter(function (org) {
+      return String(org.code || '') === String(code || '');
+    })[0] || null;
+  }
+
+  function detailErrorMessage(error) {
+    var message = error && error.message ? error.message : error;
+    return message || 'Nao foi possivel carregar este bloco.';
+  }
+
+  function safeDetail(promise, fallback) {
+    return promise.then(function (data) {
+      return { ok: true, data: data };
+    }).catch(function (error) {
+      return { ok: false, data: fallback, error: detailErrorMessage(error) };
+    });
+  }
+
+  function openStaffOrgDetails(orgCode) {
+    var current = state();
+    var details = current.staffOrgDetails;
+    orgCode = String(orgCode || '').replace(/^\s+|\s+$/g, '');
+    if (!orgCode) return;
+
+    details.open = true;
+    details.orgCode = orgCode;
+    details.activeTab = 'summary';
+    details.loading = true;
+    details.error = null;
+    details.data = {
+      org: findStaffOrgByCode(orgCode),
+      access: null,
+      members: [],
+      bank: null,
+      transactions: [],
+      goals: [],
+      recruitment: [],
+      logs: [],
+      errors: {}
+    };
+    render();
+
+    var tasks = {
+      org: safeDetail(window.MZOrgService.getOrg(orgCode), details.data.org),
+      access: safeDetail(window.MZOrgAccessService.getOrgAccess(orgCode), null),
+      members: safeDetail(window.MZOrgMemberService.listMembers(orgCode), []),
+      bank: safeDetail(window.MZOrgBankService.getOrgBank(orgCode), null),
+      transactions: safeDetail(window.MZOrgBankService.listOrgBankTransactions(orgCode, { limit: 10 }), []),
+      goals: safeDetail(window.MZOrgGoalService.listGoals({ orgCode: orgCode, limit: 10 }), []),
+      recruitment: safeDetail(window.MZOrgRecruitmentService.listRecruitment(orgCode, { limit: 10 }), []),
+      logs: safeDetail(window.MZOrgLogService.listLogs({ orgCode: orgCode, limit: 20 }), [])
+    };
+
+    Promise.all([
+      tasks.org,
+      tasks.access,
+      tasks.members,
+      tasks.bank,
+      tasks.transactions,
+      tasks.goals,
+      tasks.recruitment,
+      tasks.logs
+    ]).then(function (results) {
+      var keys = ['org', 'access', 'members', 'bank', 'transactions', 'goals', 'recruitment', 'logs'];
+      var data = {
+        org: details.data && details.data.org,
+        access: null,
+        members: [],
+        bank: null,
+        transactions: [],
+        goals: [],
+        recruitment: [],
+        logs: [],
+        errors: {}
+      };
+
+      results.forEach(function (result, index) {
+        var key = keys[index];
+        data[key] = result.data;
+        if (!result.ok) data.errors[key] = result.error;
+      });
+
+      if (!data.org) data.org = findStaffOrgByCode(orgCode);
+      details.data = data;
+    }).catch(function (error) {
+      details.error = detailErrorMessage(error);
+    }).finally(function () {
+      details.loading = false;
+      render();
+    });
+  }
+
+  function closeStaffOrgDetails() {
+    var details = state().staffOrgDetails;
+    details.open = false;
+    details.orgCode = null;
+    details.activeTab = 'summary';
+    details.loading = false;
+    details.error = null;
+    details.data = null;
+    render();
+  }
+
+  function setStaffOrgDetailTab(tab) {
+    var valid = staffOrgDetailTabs.some(function (item) { return item.id === tab; });
+    if (!valid) return;
+    state().staffOrgDetails.activeTab = tab;
+    render();
+  }
+
+  function staffOrgDetailData() {
+    return state().staffOrgDetails.data || { errors: {} };
+  }
+
+  function renderStaffOrgDetailView() {
+    var details = state().staffOrgDetails || {};
+    var data = staffOrgDetailData();
+    var org = data.org || findStaffOrgByCode(details.orgCode) || {};
+    var title = org.name || details.orgCode || 'Organizacao';
+    var active = details.activeTab || 'summary';
+
+    if (details.error) {
+      return '<section class="staff-org-detail">' +
+        '<button class="btn btn-ghost staff-org-detail-back" data-action="staff-close-org-details">Voltar para organizacoes</button>' +
+        ui().card('Detalhes da organizacao', 'Consulta read-only.', ui().errorBox(details.error), 'staff-list-card') +
+      '</section>';
+    }
+
+    return '<section class="staff-org-detail">' +
+      '<div class="staff-org-detail-header">' +
+        '<button class="btn btn-ghost staff-org-detail-back" data-action="staff-close-org-details">Voltar para organizacoes</button>' +
+        '<div><span class="module-kicker">Organizacao</span><h3>' + ui().safeText(title) + '</h3><p>' + ui().safeText(details.orgCode || org.code || '-') + ' - consulta administrativa read-only</p></div>' +
+        '<div class="badge-row">' + ui().badge(fmt().formatOrgType(org.type || org.typeCode || 'legal'), staffOrgVariant(org.type || org.typeCode)) + ui().badge(details.loading ? 'Carregando' : 'Read-only', details.loading ? 'warning' : 'muted') + '</div>' +
+      '</div>' +
+      renderStaffOrgDetailTabs(active) +
+      '<div class="staff-org-detail-body">' + renderStaffOrgDetailTab(active, data, details.loading) + '</div>' +
+    '</section>';
+  }
+
+  function renderStaffOrgDetailTabs(active) {
+    return '<nav class="staff-org-detail-tabs" aria-label="Detalhes da organizacao">' + staffOrgDetailTabs.map(function (tab) {
+      return '<button class="staff-org-detail-tab' + (tab.id === active ? ' is-active' : '') + '" data-staff-org-detail-tab="' + ui().escapeHtml(tab.id) + '">' + ui().safeText(tab.label) + '</button>';
+    }).join('') + '</nav>';
+  }
+
+  function renderStaffOrgDetailTab(tab, data, loading) {
+    if (loading) return ui().card('Carregando detalhes', 'Buscando dados autorizados por orgCode.', ui().loading('Carregando detalhes da organizacao'), 'staff-org-detail-card');
+    if (tab === 'grades') return renderStaffOrgDetailGrades(data);
+    if (tab === 'members') return renderStaffOrgDetailMembers(data);
+    if (tab === 'bank') return renderStaffOrgDetailBank(data);
+    if (tab === 'goals') return renderStaffOrgDetailGoals(data);
+    if (tab === 'recruitment') return renderStaffOrgDetailRecruitment(data);
+    if (tab === 'logs') return renderStaffOrgDetailLogs(data);
+    return renderStaffOrgDetailSummary(data);
+  }
+
+  function renderDetailBlockError(data, key) {
+    return data.errors && data.errors[key]
+      ? '<div class="inline-message error-inline">' + ui().safeText(data.errors[key]) + '</div>'
+      : '';
+  }
+
+  function renderStaffOrgDetailSummary(data) {
+    var org = data.org || {};
+    var members = Array.isArray(data.members) ? data.members : [];
+    var goals = Array.isArray(data.goals) ? data.goals : [];
+    var recruitment = Array.isArray(data.recruitment) ? data.recruitment : [];
+    var pendingRecruitment = recruitment.filter(function (item) { return String(item.status || '').toLowerCase() === 'pending'; }).length;
+    var activeGoals = goals.filter(function (goal) { return String(goal.status || 'active').toLowerCase() === 'active'; }).length;
+
+    var flags = '<div class="badge-row">' +
+      ui().badge(org.hasSalary || org.has_salary ? 'Salario' : 'Sem salario', org.hasSalary || org.has_salary ? 'info' : 'muted') +
+      ui().badge(org.hasSharedAccount || org.has_shared_account ? 'Conta compartilhada' : 'Sem conta', org.hasSharedAccount || org.has_shared_account ? 'success' : 'muted') +
+      ui().badge(org.hasStorage || org.has_storage ? 'Bau/storage' : 'Sem storage', org.hasStorage || org.has_storage ? 'info' : 'muted') +
+      ui().badge(org.active === false ? 'Inativa' : 'Ativa', org.active === false ? 'warning' : 'success') +
+    '</div>';
+
+    return '<div class="staff-org-detail-grid">' +
+      ui().card('Resumo', 'Dados principais retornados pelos callbacks de leitura.', '<div class="data-list">' +
+        '<div><span>Nome</span><strong>' + ui().safeText(org.name || '-') + '</strong></div>' +
+        '<div><span>Codigo</span><strong>' + ui().safeText(org.code || org.orgCode || '-') + '</strong></div>' +
+        '<div><span>Tipo</span><strong>' + ui().safeText(fmt().formatOrgType(org.type || org.typeCode)) + '</strong></div>' +
+        '<div><span>Status</span><strong>' + ui().safeText(org.active === false ? 'Inativa' : 'Ativa') + '</strong></div>' +
+      '</div>' + flags, 'staff-org-detail-card') +
+      ui().card('Indicadores', 'Resumo operacional sem permitir edicao.', '<div class="data-list">' +
+        '<div><span>Membros</span><strong>' + ui().safeText(members.length || org.memberCount || '-') + '</strong></div>' +
+        '<div><span>Saldo</span><strong>' + ui().safeText(data.bank ? fmt().formatMoney(data.bank.balance, data.bank.currency) : '-') + '</strong></div>' +
+        '<div><span>Metas ativas</span><strong>' + ui().safeText(activeGoals) + '</strong></div>' +
+        '<div><span>Candidaturas pendentes</span><strong>' + ui().safeText(pendingRecruitment) + '</strong></div>' +
+      '</div>' + renderDetailBlockError(data, 'bank') + renderDetailBlockError(data, 'recruitment'), 'staff-org-detail-card') +
+    '</div>';
+  }
+
+  function renderStaffOrgDetailGrades(data) {
+    var access = data.access || {};
+    var grades = Array.isArray(access.grades) ? access.grades : [];
+    var baseCaps = Array.isArray(access.baseCapabilities) ? access.baseCapabilities : [];
+    var base = baseCaps.length ? capabilityBadges(baseCaps, 12) : ui().empty('Sem permissoes base', 'Nenhuma permissao base foi retornada.');
+    var body = grades.length ? renderGradesTable(grades) : ui().empty('Nenhum cargo retornado', 'O core nao retornou cargos para esta organizacao.');
+    return ui().card('Cargos e permissoes', 'Consulta read-only. Editor de cargos/permissoes fica para fase futura.', renderDetailBlockError(data, 'access') + '<div class="access-section"><h4>Permissoes base</h4>' + base + '</div><div class="access-section"><h4>Hierarquia</h4>' + body + '</div>', 'staff-org-detail-card');
+  }
+
+  function renderStaffOrgDetailMembers(data) {
+    var members = Array.isArray(data.members) ? data.members : [];
+    var body = !members.length
+      ? ui().empty('Nenhum membro retornado', 'Gestao administrativa de membros fica para fase futura.')
+      : '<div class="staff-org-detail-table"><table><thead><tr><th>Membro</th><th>CitizenID</th><th>Cargo</th><th>Status</th><th>Entrada</th></tr></thead><tbody>' + members.map(function (member) {
+        return '<tr><td class="cell-strong">' + ui().safeText(member.name || 'Membro') + '</td><td>' + ui().safeText(fmt().maskCitizenId(member.citizenid)) + '</td><td>' + ui().safeText(fmt().formatGradeName(member)) + '</td><td>' + ui().badge(member.isDuty ? 'Em servico' : fmt().formatStatusLabel(member.status || 'active'), member.isDuty ? 'success' : 'muted') + '</td><td>' + ui().safeText(fmt().formatDate(member.joinedAt)) + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+    return ui().card('Membros', 'Lista read-only. Sem promover, rebaixar, remover ou adicionar pelo Staff nesta fase.', renderDetailBlockError(data, 'members') + body, 'staff-org-detail-card');
+  }
+
+  function renderStaffOrgDetailBank(data) {
+    var transactions = Array.isArray(data.transactions) ? data.transactions : [];
+    var account = data.bank;
+    var summary = account
+      ? '<article class="bank-summary-card"><span>Saldo atual</span><strong>' + fmt().formatMoney(account.balance, account.currency) + '</strong><small>Consulta read-only pelo Staff.</small></article>'
+      : ui().empty('Banco indisponivel', 'Esta org pode nao ter conta compartilhada ou sua sessao nao pode consultar.');
+    var txBody = !transactions.length
+      ? ui().empty('Sem movimentos recentes', 'Nenhuma transacao retornada para esta org.')
+      : '<div class="staff-org-detail-table"><table><thead><tr><th>Data</th><th>Tipo</th><th>Valor</th><th>Ator</th><th>Motivo</th></tr></thead><tbody>' + transactions.map(function (tx) {
+        return '<tr><td>' + ui().safeText(fmt().formatDate(tx.createdAt)) + '</td><td>' + ui().badge(fmt().formatStatusLabel(tx.type), tx.type === 'withdraw' ? 'warning' : 'success') + '</td><td>' + ui().safeText(fmt().formatMoney(tx.amount, tx.currency)) + '</td><td>' + ui().safeText(tx.actorName || fmt().maskCitizenId(tx.actorCitizenId)) + '</td><td>' + ui().safeText(tx.reason || '-') + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+    return ui().card('Banco', 'Consulta de saldo e ultimos movimentos. Staff nao deposita nem saca por aqui.', renderDetailBlockError(data, 'bank') + renderDetailBlockError(data, 'transactions') + summary + txBody, 'staff-org-detail-card');
+  }
+
+  function renderStaffOrgDetailGoals(data) {
+    var goals = Array.isArray(data.goals) ? data.goals : [];
+    var body = !goals.length
+      ? ui().empty('Nenhuma meta retornada', 'Progresso/conclusao real de metas sera implementado em fase futura.')
+      : '<div class="staff-org-detail-table"><table><thead><tr><th>Meta</th><th>Status</th><th>Tipo</th><th>Progresso</th><th>Criador</th></tr></thead><tbody>' + goals.map(function (goal) {
+        return '<tr><td class="cell-strong">' + ui().safeText(goal.title || 'Meta') + '</td><td>' + ui().badge(fmt().formatStatusLabel(goal.status || 'active'), goalStatusVariant(goal.status)) + '</td><td>' + ui().safeText(fmt().formatGoalType(goal.type)) + '</td><td>' + renderGoalProgress(goal) + '</td><td>' + ui().safeText(goal.createdByName || fmt().maskCitizenId(goal.createdByCitizenId)) + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+    return ui().card('Metas', 'Read-only. Criacao, edicao e progresso administrativo nao existem nesta tela.', renderDetailBlockError(data, 'goals') + body + '<p class="soft-note">Progresso/conclusao real de metas permanece pendente para fase futura.</p>', 'staff-org-detail-card');
+  }
+
+  function renderStaffOrgDetailRecruitment(data) {
+    var items = Array.isArray(data.recruitment) ? data.recruitment : [];
+    var counts = recruitmentSummary(items);
+    var body = !items.length
+      ? ui().empty('Nenhuma candidatura retornada', 'Acoes de aprovar/recusar permanecem no contexto /org ou /gang.')
+      : '<div class="staff-org-detail-table"><table><thead><tr><th>Candidato</th><th>CitizenID</th><th>Status</th><th>Cargo</th><th>Data</th></tr></thead><tbody>' + items.map(function (item) {
+        var grade = item.desiredGradeLevel ? 'Nivel ' + item.desiredGradeLevel : (item.desiredGradeCode || '-');
+        return '<tr><td class="cell-strong">' + ui().safeText(item.candidateName || item.targetName || 'Candidato') + '</td><td>' + ui().safeText(fmt().maskCitizenId(item.candidateCitizenId || item.targetCitizenId)) + '</td><td>' + ui().badge(fmt().formatStatusLabel(item.status), recruitmentStatusVariant(item.status)) + '</td><td>' + ui().safeText(grade) + '</td><td>' + ui().safeText(fmt().formatDate(item.createdAt)) + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+    return ui().card('Recrutamento', 'Consulta read-only por organizacao. Staff nao aprova nem recusa por aqui nesta fase.', renderDetailBlockError(data, 'recruitment') + '<div class="staff-org-detail-grid compact">' + renderRecruitmentSummaryCard('Pendentes', counts.pending, 'Aguardando decisao.') + renderRecruitmentSummaryCard('Aprovados', counts.approved, 'Viraram membros.') + renderRecruitmentSummaryCard('Recusados', counts.rejected, 'Recusadas recentemente.') + '</div>' + body, 'staff-org-detail-card');
+  }
+
+  function renderStaffOrgDetailLogs(data) {
+    var logs = Array.isArray(data.logs) ? data.logs : [];
+    return ui().card('Logs recentes', 'Eventos filtrados pela org, sem payload tecnico bruto.', renderDetailBlockError(data, 'logs') + renderStaffLogList(logs, 'Nenhum log recente retornado para esta org.'), 'staff-org-detail-card');
+  }
+
+  function canCreateStaffOrg() {
+    var current = state();
+    if (!current.session) return false;
+    if (current.session.user && current.session.user.isOwner) return true;
+    return perms().hasGlobalPermission(current.session, 'staff.orgs.create');
+  }
+
+  function renderStaffCreateOrgPanel() {
+    var current = state();
+    var form = current.staffCreateOrg || {};
+    var message = form.message ? '<div class="inline-message success">' + ui().safeText(form.message) + '</div>' : '';
+    var error = form.error && !form.open ? '<div class="inline-message error-inline">' + ui().safeText(formatStaffCreateOrgError(form.error)) + '</div>' : '';
+
+    if (!canCreateStaffOrg()) {
+      return ui().card('Criar organizacao', 'Criacao por template seguro.', '<div class="badge-row">' + ui().badge('Bloqueado', 'warning') + '</div><p class="soft-note">Requer staff.orgs.create ou owner.</p>', 'staff-list-card');
+    }
+
+    return ui().card('Criar organizacao', 'Templates seguros criam cargos, permissoes e conta quando aplicavel.', '<div class="staff-action-grid compact">' +
+      '<button class="staff-action-card" data-action="open-staff-create-org-modal">' +
+        ui().renderIcon('assets/icons/orgs.svg', 'O', 'inline-icon-box') +
+        '<span><strong>Criar organizacao</strong><small>Job, faccao, empresa, governo, VIP ou evento.</small></span>' +
+      '</button>' +
+    '</div><p class="soft-note">A criacao usa templates do servidor. Editor avancado de cargos/permissoes fica para fase futura.</p>' + message + error, 'staff-list-card');
+  }
+
+  function openStaffCreateOrgModal() {
+    var modal = state().staffCreateOrg;
+    modal.open = true;
+    modal.type = modal.type || 'gang';
+    modal.code = modal.code || '';
+    modal.name = modal.name || '';
+    modal.hasSalary = modal.hasSalary === true;
+    modal.hasSharedAccount = modal.hasSharedAccount !== false;
+    modal.hasStorage = modal.hasStorage !== false;
+    modal.reason = modal.reason || '';
+    modal.loading = false;
+    modal.error = null;
+    modal.message = null;
+    render();
+  }
+
+  function closeStaffCreateOrgModal() {
+    var modal = state().staffCreateOrg;
+    if (modal.loading) return;
+    modal.open = false;
+    modal.error = null;
+    render();
+  }
+
+  function renderStaffCreateOrgModal() {
+    var modal = state().staffCreateOrg || {};
+    if (!modal.open) return '';
+
+    var options = staffOrgCreateTypes.map(function (item) {
+      return '<option value="' + ui().escapeHtml(item.id) + '"' + (modal.type === item.id ? ' selected' : '') + '>' + ui().safeText(item.label) + '</option>';
+    }).join('');
+
+    var error = modal.error ? '<div class="staff-org-modal-error">' + ui().safeText(formatStaffCreateOrgError(modal.error)) + '</div>' : '';
+    return '<div class="staff-org-modal-backdrop" role="presentation">' +
+      '<section class="staff-org-modal" role="dialog" aria-modal="true" aria-label="Criar organizacao">' +
+        '<div class="staff-org-modal-header"><div><span>Staff</span><h3>Criar organizacao</h3><p>Template seguro, sem editor livre nesta fase.</p></div><button class="modal-close" data-action="close-staff-create-org-modal" aria-label="Cancelar">x</button></div>' +
+        '<div class="staff-org-modal-body">' +
+          '<label><span>Tipo</span><select data-staff-create-org-field="type" ' + (modal.loading ? 'disabled' : '') + '>' + options + '</select></label>' +
+          '<label><span>Codigo</span><input data-staff-create-org-field="code" maxlength="48" value="' + ui().safeText(modal.code) + '" placeholder="Ex: mafia_norte" ' + (modal.loading ? 'disabled' : '') + ' /></label>' +
+          '<label><span>Nome</span><input data-staff-create-org-field="name" maxlength="120" value="' + ui().safeText(modal.name) + '" placeholder="Ex: Mafia Norte" ' + (modal.loading ? 'disabled' : '') + ' /></label>' +
+          '<label class="toggle-line"><input data-staff-create-org-field="hasSharedAccount" type="checkbox" ' + (modal.hasSharedAccount ? 'checked' : '') + ' ' + (modal.loading ? 'disabled' : '') + ' /> <span>Conta compartilhada</span></label>' +
+          '<label class="toggle-line"><input data-staff-create-org-field="hasStorage" type="checkbox" ' + (modal.hasStorage ? 'checked' : '') + ' ' + (modal.loading ? 'disabled' : '') + ' /> <span>Bau/storage</span></label>' +
+          '<label class="toggle-line"><input data-staff-create-org-field="hasSalary" type="checkbox" ' + (modal.hasSalary ? 'checked' : '') + ' ' + (modal.loading ? 'disabled' : '') + ' /> <span>Salario</span></label>' +
+          '<label class="staff-org-modal-wide"><span>Motivo opcional</span><textarea data-staff-create-org-field="reason" maxlength="255" rows="3" placeholder="Motivo para auditoria" ' + (modal.loading ? 'disabled' : '') + '>' + ui().safeText(modal.reason) + '</textarea></label>' +
+          '<small class="soft-note staff-org-modal-wide">A NUI envia somente tipo, codigo, nome, opcoes basicas e motivo. Cargos e permissoes sao calculados pelo servidor.</small>' +
+          error +
+        '</div>' +
+        '<div class="staff-org-modal-actions">' +
+          '<button class="btn btn-ghost" data-action="close-staff-create-org-modal" ' + (modal.loading ? 'disabled' : '') + '>Cancelar</button>' +
+          '<button class="btn btn-primary" data-action="submit-staff-create-org-modal" ' + (modal.loading ? 'disabled' : '') + '>' + ui().safeText(modal.loading ? 'Criando...' : 'Criar organizacao') + '</button>' +
+        '</div>' +
+      '</section>' +
+    '</div>';
+  }
+
+  function formatStaffCreateOrgError(error) {
+    var key = String(error || '').toLowerCase();
+    if (key.indexOf('invalid_type') !== -1 || key.indexOf('tipo') !== -1) return 'Tipo de organizacao invalido.';
+    if (key.indexOf('invalid_code') !== -1 || key.indexOf('codigo') !== -1) return 'Informe um codigo valido.';
+    if (key.indexOf('invalid_name') !== -1 || key.indexOf('nome') !== -1) return 'Informe um nome valido.';
+    if (key.indexOf('org_already_exists') !== -1 || key.indexOf('ja existe') !== -1) return 'Ja existe uma organizacao com esse codigo.';
+    if (key.indexOf('forbidden') !== -1 || key.indexOf('permiss') !== -1) return 'Voce nao tem permissao para criar organizacoes.';
+    if (key.indexOf('template_not_found') !== -1 || key.indexOf('template') !== -1) return 'Template nao encontrado.';
+    if (key.indexOf('create_grade_failed') !== -1) return 'Nao foi possivel criar os cargos padrao.';
+    if (key.indexOf('create_permission_failed') !== -1) return 'Nao foi possivel criar as permissoes padrao.';
+    if (key.indexOf('create_account_failed') !== -1) return 'Nao foi possivel criar a conta compartilhada.';
+    if (key.indexOf('rate_limited') !== -1 || key.indexOf('aguarde') !== -1) return 'Aguarde alguns segundos e tente novamente.';
+    return error || 'Nao foi possivel criar a organizacao.';
+  }
+
+  function submitStaffCreateOrgModal() {
+    var current = state();
+    var modal = current.staffCreateOrg;
+    var app = document.getElementById('app');
+
+    function field(name) {
+      var input = app && app.querySelector('[data-staff-create-org-field="' + name + '"]');
+      if (!input) return modal[name] || '';
+      if (input.type === 'checkbox') return input.checked;
+      return input.value.replace(/^\s+|\s+$/g, '');
+    }
+
+    modal.type = field('type') || 'gang';
+    modal.code = field('code');
+    modal.name = field('name');
+    modal.hasSalary = field('hasSalary') === true;
+    modal.hasSharedAccount = field('hasSharedAccount') === true;
+    modal.hasStorage = field('hasStorage') === true;
+    modal.reason = field('reason');
+    modal.error = null;
+    modal.message = null;
+
+    if (!modal.code) {
+      modal.error = 'Informe um codigo valido.';
+      render();
+      return;
+    }
+
+    if (!modal.name) {
+      modal.error = 'Informe um nome valido.';
+      render();
+      return;
+    }
+
+    modal.loading = true;
+    render();
+
+    window.MZOrgService.createOrgFromTemplate({
+      type: modal.type,
+      code: modal.code,
+      name: modal.name,
+      hasSalary: modal.hasSalary,
+      hasSharedAccount: modal.hasSharedAccount,
+      hasStorage: modal.hasStorage,
+      reason: modal.reason
+    }).then(function (data) {
+      var org = data && data.org ? data.org : {};
+      modal.message = 'Organizacao criada: ' + (org.name || modal.name) + '.';
+      modal.open = false;
+      modal.type = 'gang';
+      modal.code = '';
+      modal.name = '';
+      modal.hasSalary = false;
+      modal.hasSharedAccount = true;
+      modal.hasStorage = true;
+      modal.reason = '';
+      current.orgs.loaded = false;
+      current.orgs.loadedKey = '';
+      current.orgs.data = [];
+      current.logs.loaded = false;
+      current.logs.loadedKey = '';
+      loadOrgs();
+      if (canLoadStaffGlobalLogs()) loadLogs({ limit: 100 });
+    }).catch(function (err) {
+      modal.error = formatStaffCreateOrgError(err.message);
+    }).finally(function () {
+      modal.loading = false;
+      render();
+    });
+  }
+
+  function staffOrgVariant(type) {
+    type = String(type || '').toLowerCase();
+    if (type === 'gang' || type === 'illegal') return 'danger';
+    if (type === 'staff') return 'owner';
+    if (type === 'business') return 'success';
+    return 'info';
+  }
+
+  function renderStaffLogsSection() {
+    var current = state();
+    var logs = filteredLogs();
+    var categoryOptions = unique(current.logs.data.map(function (log) { return log.category; }));
+    var severityOptions = unique(current.logs.data.map(function (log) { return log.severity; }));
+    var orgOptions = unique(current.logs.data.map(function (log) { return log.orgCode; }));
+    var body = current.logs.loading
+      ? ui().loading('Carregando logs')
+      : current.logs.error
+        ? ui().errorBox(current.logs.error)
+        : renderStaffLogList(logs, 'Nenhum log visivel com os filtros atuais.');
+
+    return ui().card('Filtros', 'Filtros locais sobre os logs ja autorizados pelo servidor.', renderLogFilters(categoryOptions, severityOptions, orgOptions), 'staff-list-card') +
+      ui().card('Logs recentes', 'Lista legivel, sem payload tecnico bruto.', body, 'staff-list-card');
+  }
+
+  function renderStaffAuditSection() {
+    var current = state();
+    var logs = sensitiveStaffLogs();
+    var body = current.logs.loading
+      ? ui().loading('Carregando auditoria')
+      : current.logs.error
+        ? ui().errorBox(current.logs.error)
+        : renderStaffLogList(logs, 'Nenhum evento sensivel recente encontrado.');
+
+    return ui().card('Auditoria sensivel', 'Eventos de lideranca, membros, banco, recrutamento e metas dentro dos logs recentes.', body, 'staff-list-card');
+  }
+
+  function sensitiveStaffLogs() {
+    return (state().logs.data || []).filter(function (log) {
+      var action = String(log.action || '').toLowerCase();
+      return sensitiveAuditActions.some(function (item) {
+        return action.indexOf(item) !== -1;
+      });
+    });
+  }
+
+  function renderStaffLogList(logs, emptyMessage) {
+    logs = Array.isArray(logs) ? logs : [];
+    if (!logs.length) return ui().empty(emptyMessage || 'Nenhum evento encontrado.', 'Os dados aparecem aqui quando o servidor retornar logs permitidos.');
+
+    return '<div class="staff-log-list">' + logs.map(function (log) {
+      return '<article class="staff-log-item">' +
+        '<div><strong>' + ui().safeText(formatLogAction(log)) + '</strong><span>' + ui().safeText(fmt().formatDate(log.createdAt)) + '</span></div>' +
+        '<div class="badge-row">' + ui().badge(fmt().formatStatusLabel(log.severity || 'info'), severityVariant(log.severity)) + (log.orgCode ? ui().badge(log.orgCode, 'muted') : '') + '</div>' +
+        '<p>' + ui().safeText(log.message || log.reason || 'Evento registrado pelo servidor.') + '</p>' +
+        '<small>Autor: ' + ui().safeText(log.actorName || fmt().maskCitizenId(log.actorCitizenId)) + ' | Alvo: ' + ui().safeText(log.targetName || fmt().maskCitizenId(log.targetCitizenId)) + '</small>' +
+      '</article>';
+    }).join('') + '</div>';
+  }
+
+  function formatLogAction(log) {
+    var action = log && log.action ? log.action : (log && log.category);
+    if (fmt().formatActionLabel) return fmt().formatActionLabel(action);
+    return fmt().formatStatusLabel(action);
+  }
+
+  function renderStaffActionsSection() {
     var leaderCard = canShowStaffLeaderCard()
       ? renderStaffLeaderCard()
       : ui().card('Definir lider', 'Acao administrativa restrita.', '<div class="badge-row">' + ui().badge('Bloqueado', 'warning') + '</div><p class="soft-note">Requer staff.orgs.set_leader ou owner.</p>', 'staff-leader-card');
 
-    return '<div class="screen">' +
-      '<div class="page-heading"><div><span class="module-kicker">Staff</span><h2>Area administrativa</h2><p>Visao organizada para auditoria e consulta. Acoes criticas continuam bloqueadas no servidor.</p></div>' + ui().badge(perms().getAccessLabel(), perms().getAccessVariant()) + '</div>' +
-      '<div class="metric-grid">' + ui().metricCard('assets/icons/staff.svg', 'Liberado', 'Acesso staff/owner', 'S') + ui().metricCard('assets/icons/logs.svg', perms().canViewModule(state().session, 'logs') ? 'Disponivel' : 'Oculto', 'Auditoria') + ui().metricCard('assets/icons/lock.svg', 'Protegidas', 'Acoes sensiveis', 'B') + '</div>' +
-      '<div class="two-col">' +
-        ui().card('Visao administrativa', 'Atalhos seguros para consulta.', '<div class="module-card-grid"><button class="module-card" data-module="orgs">' + ui().renderIcon('assets/icons/orgs.svg', 'O', 'inline-icon-box') + '<span><strong>Organizacoes</strong><small>Consultar orgs visiveis</small></span></button><button class="module-card" data-module="logs">' + ui().renderIcon('assets/icons/logs.svg', 'L', 'inline-icon-box') + '<span><strong>Logs</strong><small>Acompanhar auditoria</small></span></button></div>') +
-        leaderCard +
-      '</div>' +
+    return '<div class="staff-action-grid">' +
+      leaderCard +
+      renderDisabledStaffAction('Adicionar membro global', 'Criar membro em qualquer org sera uma fase propria com permissao forte.') +
+      renderDisabledStaffAction('Remover membro global', 'Remocao administrativa global continua bloqueada nesta fase.') +
+      renderDisabledStaffAction('Gerenciar staff', 'Hierarquia e gestao de staff permanecem fase futura.') +
+      renderDisabledStaffAction('Editar cargos/permissoes', 'Editor de grades e capabilities nao faz parte desta fase.') +
     '</div>';
+  }
+
+  function renderDisabledStaffAction(title, description) {
+    return '<section class="staff-action-card is-disabled">' +
+      '<div class="badge-row">' + ui().badge('Em fase futura', 'muted') + '</div>' +
+      '<span><strong>' + ui().safeText(title) + '</strong><small>' + ui().safeText(description) + '</small></span>' +
+    '</section>';
   }
 
   function canShowStaffLeaderCard() {
@@ -2295,8 +2988,8 @@
   }
 
   function renderLogsTable(logs) {
-    return '<div class="table-scroll logs-scroll"><table><thead><tr><th>Data</th><th>Status</th><th>Acao</th><th>Autor</th><th>Alvo</th><th>Mensagem</th><th>Avancado</th></tr></thead><tbody>' + logs.map(function (log) {
-      return '<tr><td>' + ui().safeText(fmt().formatDate(log.createdAt)) + '</td><td>' + ui().badge(fmt().formatStatusLabel(log.severity || 'info'), severityVariant(log.severity)) + '</td><td class="cell-strong">' + ui().safeText(fmt().formatStatusLabel(log.action || log.category)) + '<span class="cell-subtitle">' + ui().safeText(fmt().formatStatusLabel(log.category)) + '</span></td><td>' + ui().safeText(log.actorName || fmt().maskCitizenId(log.actorCitizenId)) + '</td><td>' + ui().safeText(log.targetName || fmt().maskCitizenId(log.targetCitizenId)) + '</td><td>' + ui().safeText(log.message || log.reason) + '</td><td>' + ui().technicalDetails('Detalhes', [{ label: 'Org', value: log.orgCode }, { label: 'Acao tecnica', value: log.action }, { label: 'Autor CID', value: log.actorCitizenId }, { label: 'Alvo CID', value: log.targetCitizenId }]) + '</td></tr>';
+    return '<div class="table-scroll logs-scroll"><table><thead><tr><th>Data</th><th>Status</th><th>Acao</th><th>Autor</th><th>Alvo</th><th>Mensagem</th></tr></thead><tbody>' + logs.map(function (log) {
+      return '<tr><td>' + ui().safeText(fmt().formatDate(log.createdAt)) + '</td><td>' + ui().badge(fmt().formatStatusLabel(log.severity || 'info'), severityVariant(log.severity)) + '</td><td class="cell-strong">' + ui().safeText(formatLogAction(log)) + '<span class="cell-subtitle">' + ui().safeText(fmt().formatStatusLabel(log.category)) + '</span></td><td>' + ui().safeText(log.actorName || fmt().maskCitizenId(log.actorCitizenId)) + '</td><td>' + ui().safeText(log.targetName || fmt().maskCitizenId(log.targetCitizenId)) + '</td><td>' + ui().safeText(log.message || log.reason) + '</td></tr>';
     }).join('') + '</tbody></table></div>';
   }
 
@@ -2458,6 +3151,36 @@
     if (staffSetLeaderButton) {
       staffSetLeaderButton.addEventListener('click', submitStaffLeader);
     }
+
+    var openStaffCreateOrgButton = app.querySelector('[data-action="open-staff-create-org-modal"]');
+    if (openStaffCreateOrgButton) {
+      openStaffCreateOrgButton.addEventListener('click', openStaffCreateOrgModal);
+    }
+
+    app.querySelectorAll('[data-action="close-staff-create-org-modal"]').forEach(function (button) {
+      button.addEventListener('click', closeStaffCreateOrgModal);
+    });
+
+    var submitStaffCreateOrgButton = app.querySelector('[data-action="submit-staff-create-org-modal"]');
+    if (submitStaffCreateOrgButton) {
+      submitStaffCreateOrgButton.addEventListener('click', submitStaffCreateOrgModal);
+    }
+
+    app.querySelectorAll('[data-action="staff-view-org-details"]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        openStaffOrgDetails(button.getAttribute('data-org-code'));
+      });
+    });
+
+    app.querySelectorAll('[data-action="staff-close-org-details"]').forEach(function (button) {
+      button.addEventListener('click', closeStaffOrgDetails);
+    });
+
+    app.querySelectorAll('[data-staff-org-detail-tab]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        setStaffOrgDetailTab(button.getAttribute('data-staff-org-detail-tab'));
+      });
+    });
 
     app.querySelectorAll('[data-log-filter]').forEach(function (input) {
       input.addEventListener('input', function (event) {

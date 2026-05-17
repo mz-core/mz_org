@@ -32,6 +32,7 @@ MZOrgCapabilities = {
   'staff.panel.open',
   'staff.orgs.view',
   'staff.orgs.manage',
+  'staff.orgs.create',
   'staff.orgs.set_leader',
   'staff.members.invite',
   'staff.members.remove',

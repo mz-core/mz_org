@@ -14,8 +14,24 @@
     });
   }
 
+  function createOrgFromTemplate(payload) {
+    payload = payload || {};
+    return window.MZOrgNui.callNuiData('orgs:createFromTemplate', {
+      type: payload.type,
+      code: payload.code,
+      name: payload.name,
+      hasSalary: payload.hasSalary === true,
+      hasSharedAccount: payload.hasSharedAccount === true,
+      hasStorage: payload.hasStorage === true,
+      reason: payload.reason || ''
+    }).then(function (data) {
+      return data || null;
+    });
+  }
+
   window.MZOrgService = {
     listOrgs: listOrgs,
-    getOrg: getOrg
+    getOrg: getOrg,
+    createOrgFromTemplate: createOrgFromTemplate
   };
 }());

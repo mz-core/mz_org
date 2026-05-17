@@ -95,6 +95,7 @@
     'staff.ban': 'Banir jogador',
     'staff.teleport': 'Teleportar',
     'staff.orgs.manage': 'Gerenciar orgs',
+    'staff.orgs.create': 'Criar organizacoes',
     'staff.orgs.set_leader': 'Definir liderancas',
     'staff.staff.manage': 'Gerenciar staff',
     'staff.logs.view': 'Ver logs staff',
@@ -122,6 +123,30 @@
     'mechanic.boss.actions': 'Acoes de chefia'
   };
 
+  var actionLabels = {
+    'org.member.set_leader': 'Definir lider',
+    'org.member.set_leader.blocked': 'Definir lider bloqueado',
+    'org.member.invite': 'Convidar membro',
+    'org.member.invite.blocked': 'Convite bloqueado',
+    'org.member.remove': 'Remover membro',
+    'org.member.remove.blocked': 'Remocao bloqueada',
+    'org.member.promote': 'Promover membro',
+    'org.member.promote.blocked': 'Promocao bloqueada',
+    'org.member.demote': 'Rebaixar membro',
+    'org.member.demote.blocked': 'Rebaixamento bloqueado',
+    'org.account.deposit': 'Deposito no banco da org',
+    'org.account.deposit.blocked': 'Deposito bloqueado',
+    'org.account.withdraw': 'Saque do banco da org',
+    'org.account.withdraw.blocked': 'Saque bloqueado',
+    'org.recruitment.create': 'Criar candidatura',
+    'org.recruitment.approve': 'Aprovar candidatura',
+    'org.recruitment.reject': 'Recusar candidatura',
+    'org.recruitment.cancel': 'Arquivar candidatura',
+    'org.goal.create': 'Criar meta',
+    'org.create': 'Criar organizacao',
+    'org.create.blocked': 'Criacao de org bloqueada'
+  };
+
   function titleCase(value) {
     return String(value || '').replace(/\w\S*/g, function (word) {
       return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
@@ -133,6 +158,13 @@
     if (!capability) return '-';
     if (capabilityLabels[capability]) return capabilityLabels[capability];
     return titleCase(capability.replace(/[._-]+/g, ' '));
+  }
+
+  function formatActionLabel(action) {
+    action = String(action || '').trim();
+    if (!action) return '-';
+    if (actionLabels[action]) return actionLabels[action];
+    return titleCase(action.replace(/[._-]+/g, ' '));
   }
 
   function formatGradeName(item) {
@@ -196,6 +228,7 @@
     formatNumber: formatNumber,
     formatOrgType: formatOrgType,
     formatCapabilityLabel: formatCapabilityLabel,
+    formatActionLabel: formatActionLabel,
     formatGradeName: formatGradeName,
     maskCitizenId: maskCitizenId,
     formatGoalType: formatGoalType,

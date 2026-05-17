@@ -126,6 +126,14 @@ local function canViewMembers(src, orgCode)
     return true
   end
 
+  if safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.create') == true then
+    return true
+  end
+
+  if safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.set_leader') == true then
+    return true
+  end
+
   return safeExport('mz_core', 'CanOrg', src, orgCode, 'org.view') == true
 end
 

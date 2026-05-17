@@ -100,6 +100,22 @@ local function canViewRecruitment(src, orgCode)
     return false
   end
 
+  if safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.view') == true then
+    return true
+  end
+
+  if safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.manage') == true then
+    return true
+  end
+
+  if safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.create') == true then
+    return true
+  end
+
+  if safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.set_leader') == true then
+    return true
+  end
+
   if safeExport('mz_core', 'CanOrg', src, orgCode, 'recruitment.view') == true then
     return true
   end

@@ -154,6 +154,7 @@ local function buildGlobalPermissions(src, owner, orgs)
     addUnique(permissions, Config.OwnerAce)
     addUnique(permissions, 'staff.orgs.view')
     addUnique(permissions, 'staff.orgs.manage')
+    addUnique(permissions, 'staff.orgs.create')
     addUnique(permissions, 'staff.orgs.set_leader')
     addUnique(permissions, 'staff.staff.manage')
     addUnique(permissions, 'staff.members.invite')
@@ -169,6 +170,7 @@ local function buildGlobalPermissions(src, owner, orgs)
     'staff.panel.open',
     'staff.orgs.view',
     'staff.orgs.manage',
+    'staff.orgs.create',
     'staff.orgs.set_leader',
     'staff.staff.manage',
     'staff.members.invite',
@@ -228,7 +230,9 @@ local function buildModules(owner, orgs, globalPermissions)
   local hasOrgs = #orgs > 0
   local staffAllowed = owner
     or hasGlobalPermission(globalPermissions, 'staff.panel.open')
+    or hasGlobalPermission(globalPermissions, 'staff.orgs.view')
     or hasGlobalPermission(globalPermissions, 'staff.orgs.manage')
+    or hasGlobalPermission(globalPermissions, 'staff.orgs.create')
     or hasGlobalPermission(globalPermissions, 'staff.orgs.set_leader')
     or hasGlobalPermission(globalPermissions, 'staff.logs.view')
 

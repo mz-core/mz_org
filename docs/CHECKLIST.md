@@ -60,11 +60,19 @@
 - [x] `staff.panel.open` removido como autorizador de convite/promocao/remocao de lideranca.
 - [x] `/staff` com acao minima para definir lider por `orgCode` e `citizenid`.
 - [x] Export seguro `SetOrgLeaderByCitizenId` com top grade calculado no server.
+- [x] `/staff` com criacao segura de org/faccao por template server-side.
+- [x] Export seguro `CreateOrgFromTemplate` com capability `staff.orgs.create`.
+- [x] Atalhos seguros duplicados do dashboard Staff compactados em favor das abas internas.
 - [x] Auditoria/padronizacao de capabilities, seed e aliases legados.
 - [x] Polimento visual/UX: dados tecnicos colapsados, capabilities traduzidas e listas mais limpas.
 - [x] Navegacao por contexto com abas internas implementada para `/org` e `/gang`.
 - [x] Header superior contextual destacando org/gang ativa e cargo, com abas internas sem titulo duplicado.
 - [x] Auditoria de identidade, contexto, permissoes e seguranca documentada em `docs/SECURITY_CONTEXT_REVIEW.md`.
+- [x] Analise do `/staff` realizada e documentada em `docs/STAFF_PANEL_REVIEW.md`.
+- [x] Fase Staff 1 implementada: dashboard seguro/read-only com abas, orgs, logs, auditoria e acoes bloqueadas.
+- [x] Staff Organizacoes com `Ver detalhes` read-only por orgCode.
+- [x] Detalhe Staff mostra resumo, cargos, membros, banco, metas, recrutamento e logs sem editor.
+- [x] Revisao final do MVP: contexto, UX, detalhes tecnicos, empty states, loading e docs.
 
 ## Frontend HTML/CSS/JS modular
 
@@ -82,14 +90,17 @@
 - [x] Capabilities usadas pelo painel revisadas.
 - [x] Sanitizacao de payloads de logs reforcada.
 - [x] Plano de teste manual criado em `docs/TEST_PLAN.md`.
+- [x] Plano de teste integrado do MVP criado em `docs/MVP_TEST_PLAN.md`.
 
 ## Pendente
 
-- [ ] Testes reais em jogo seguindo `docs/TEST_PLAN.md`.
+- [ ] Testes reais em jogo seguindo `docs/MVP_TEST_PLAN.md`.
 - [ ] Corrigir bugs encontrados durante testes reais.
 - [ ] Replicar navegacao interna por abas para VIP, empresa, governo e eventos.
-- [ ] Refinar navegacao administrativa do Staff.
-- [ ] Fase 1 seguranca: esconder detalhes tecnicos da UI normal e reservar detalhes completos para owner/debug.
+- [x] Refinar navegacao administrativa do Staff com dashboard seguro/read-only.
+- [ ] Manter painel staff global completo como fase futura.
+- [x] Fase 1 seguranca: detalhes tecnicos brutos ocultos/desativados na UI normal.
+- [ ] Fase futura seguranca: modo owner/debug explicito para detalhes tecnicos completos.
 - [x] Fase 2 seguranca: migrar convite principal de source online para citizenid/passaporte.
 - [x] Fase 3 seguranca: proteger top grade/lideranca com capability dedicada.
 - [ ] Fase 4 seguranca: implementar hierarquia staff completa.
@@ -115,6 +126,8 @@
 - [ ] Editar cargo.
 - [ ] Deletar cargo.
 - [ ] Alterar capability.
+- [ ] Editar org existente.
+- [ ] Excluir org.
 - [ ] Overrides individuais editaveis.
 - [ ] Logs de alteracoes de cargos/permissoes.
 - [ ] Escolher grade manualmente ao promover/rebaixar.

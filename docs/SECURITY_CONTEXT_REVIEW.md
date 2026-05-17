@@ -12,7 +12,7 @@ Esta revisao cobre `mz_core` e `mz_org` no estado atual dos arquivos. A auditori
 - `/org` e `/gang` ja usam `activeOrgCode` no frontend para membros, banco, metas, cargos, recrutamento e logs.
 - Banco de org agora usa callbacks `org-bank:deposit`, `org-bank:withdraw` e `org-bank:transactions`, sempre com `orgCode` ativo e `source` real no servidor.
 - Recrutamento agora usa `mz_org_recruitment`, `activeOrgCode` e `citizenid`; aprovar candidatura chama o fluxo real de adicionar membro.
-- A UI ainda expoe detalhes tecnicos em blocos colapsados para qualquer usuario que consiga abrir a tela.
+- A UI normal desativa detalhes tecnicos brutos; tabelas principais usam labels amigaveis e CitizenID mascarado.
 - A hierarquia de job/gang para lider comum esta parcialmente protegida.
 - `staff.panel.open` nao autoriza mais mutacoes de membros/lideranca; `staff.orgs.manage` segue amplo para gestao comum.
 - `staff.panel.open` tambem nao autoriza criar, aprovar, recusar ou arquivar candidaturas.
@@ -124,15 +124,13 @@ Nao implementado nesta fase:
 
 ## Vazamento tecnico no frontend
 
-Itens encontrados na UI:
+Estado final do MVP:
 
-- `orgCode` e tipo interno em detalhes de org/recrutamento/metas/logs.
-- `ID interno` da org em detalhes do resumo.
-- `gradeCode`, `grade`, capabilities cruas em detalhes de membros/cargos/acesso.
-- `citizenid` mascarado na linha principal, mas completo em `<details>`.
-- IDs internos de metas em detalhes.
-- Logs exibem acao tecnica, org e citizenids completos em detalhes.
-- Staff possui bloco tecnico de modulo/acoes.
+- Tabelas principais usam `maskCitizenId`.
+- Labels de capabilities passam por `formatCapabilityLabel`.
+- Labels de logs passam por `formatActionLabel` quando aplicavel.
+- Colunas avancadas vazias foram removidas.
+- O helper `technicalDetails()` permanece desativado na UI normal.
 
 Classificacao recomendada:
 
@@ -140,10 +138,10 @@ Classificacao recomendada:
 - Staff operacional: pode ver citizenid mascarado e contexto funcional, mas nao payloads brutos por padrao.
 - Owner/debug: pode ver detalhes tecnicos colapsados.
 
-Regra proposta:
+Regra proposta para fase futura:
 
 - Criar helper visual `canSeeTechnicalDetails()` baseado em `isOwner` ou modo debug explicito.
-- Para usuario normal, remover completamente `<details>` tecnicos.
+- Para usuario normal, manter detalhes tecnicos fora da tela.
 - Para staff, mostrar apenas dados operacionais necessarios, preferindo mascaramento.
 - Para owner/debug, manter detalhes colapsados.
 
@@ -200,6 +198,7 @@ Ponto de cuidado:
 
 Protecoes implementadas:
 
+- `/staff` agora tem dashboard seguro/read-only com abas internas de visao geral, organizacoes, logs, auditoria e acoes administrativas bloqueadas.
 - `/staff` possui uma acao minima para definir lider por `orgCode` e `citizenid`, sem CRUD global de orgs.
 - O export seguro `SetOrgLeaderByCitizenId(source, orgCode, targetCitizenId, options)` calcula a maior grade no core.
 - Se o alvo ja for membro ativo, a grade e atualizada para a top grade; se nao for membro ativo, e adicionado na top grade.
@@ -230,6 +229,61 @@ Regra atual:
 - Promover/convidar/rebaixar/remover grade maxima exige `members.set_leader` ou `staff.orgs.set_leader`.
 - `staff.panel.open` abre painel, mas nao autoriza mutacoes de membros nem lideranca.
 - `staff.orgs.manage` continua amplo para gestao comum, mas nao basta para top grade.
+- `staff.orgs.view` segue documentado como permissao de consulta server-side; a abertura do painel por essa permissao isolada fica como decisao pendente.
+
+## Criacao de org por template no Staff
+
+Estado implementado:
+
+- `/staff`, aba `Organizacoes`, pode abrir `Criar organizacao` somente para owner ou `staff.orgs.create`.
+- Callback NUI: `orgs:createFromTemplate`.
+- Export seguro no core: `CreateOrgFromTemplate(source, payload)`.
+- Tipos permitidos: `job`, `gang`, `business`, `government`, `vip`, `event`.
+- Tipo `staff` continua bloqueado/fase futura.
+
+Garantias:
+
+- o `source` confiavel e o source real do evento/server;
+- a NUI envia somente tipo, codigo, nome, opcoes booleanas basicas e motivo;
+- a NUI nao envia grades, permissoes, actor, source, orgId ou creator;
+- o core normaliza `code` para lowercase e permite apenas letras, numeros, `_` e `-`;
+- o core valida org duplicada antes de criar;
+- templates de grades e permissoes ficam hardcoded no server;
+- `staff.panel.open`, `staff.orgs.view` e `staff.orgs.manage` sozinhos nao autorizam a criacao;
+- logs gerados: `org.create` e `org.create.blocked`.
+
+Limites mantidos:
+
+- sem editor livre de cargos/permissoes;
+- sem excluir org;
+- sem editar org existente;
+- sem painel staff global completo.
+
+## Detalhes read-only de org no Staff
+
+Estado implementado:
+
+- `/staff > Organizacoes` troca o placeholder `Detalhe futuro` por `Ver detalhes`.
+- A tela de detalhe fica dentro do shell Staff e nao altera `activeOrgCode` de `/org` ou `/gang`.
+- A consulta usa `orgCode` e callbacks existentes de leitura: org, access model, membros, banco, metas, recrutamento e logs.
+- Nenhuma action de editar/salvar/excluir foi criada.
+
+Permissoes aceitas para leitura administrativa:
+
+- owner ACE `group.mz_owner`;
+- `staff.orgs.view`;
+- `staff.orgs.manage`;
+- `staff.orgs.create`;
+- `staff.orgs.set_leader`.
+
+Garantias:
+
+- `source` continua vindo do evento/server;
+- `orgId` vindo da NUI nao e usado;
+- CitizenID aparece mascarado;
+- payload tecnico bruto nao e exibido;
+- banco e recrutamento no Staff ficam read-only;
+- cards de edicao de org, cargos, permissoes, membros e banco continuam inexistentes/bloqueados.
 
 ## Hierarquia staff
 
