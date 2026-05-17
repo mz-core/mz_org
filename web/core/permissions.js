@@ -116,7 +116,12 @@
 
   function isStaffAccess(session) {
     session = session || state().session;
-    return canViewModule(session, 'staff') || hasGlobalPermission(session, 'staff.orgs.manage') || hasGlobalPermission(session, 'staff.panel.open');
+    return canViewModule(session, 'staff')
+      || hasGlobalPermission(session, 'staff.panel.open')
+      || hasGlobalPermission(session, 'staff.orgs.view')
+      || hasGlobalPermission(session, 'staff.orgs.manage')
+      || hasGlobalPermission(session, 'staff.orgs.set_leader')
+      || hasGlobalPermission(session, 'staff.logs.view');
   }
 
   function getAccessLabel(session) {

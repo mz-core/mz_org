@@ -80,6 +80,25 @@ O risco aparece quando `activeModule` e uma secao geral (`recruitment`, `goals`,
 - `/painel` pode mostrar modulos demais para quem deveria ver primeiro um portal de contextos, nao uma lista tecnica de modulos.
 - Owner pode ver tudo, mas isso nao deve significar misturar org pessoal com modo administrativo.
 
+## Recrutamento contextual implementado
+
+A aba `Recrutamento` agora fica dentro do contexto `/org` ou `/gang` e usa sempre `activeOrgCode`.
+
+Fluxo visual:
+
+- cards superiores mostram pendentes, aprovados e acao `Novo candidato`;
+- `Novo candidato` abre modal com CitizenID, grade desejada e observacao;
+- a lista mostra nome, CitizenID mascarado, status, cargo desejado, data e acoes;
+- candidaturas pendentes permitem aprovar, recusar ou arquivar;
+- aprovar abre confirmacao com grade inicial e nota opcional;
+- recusar/arquivar pedem motivo opcional.
+
+Isolamento:
+
+- `/org` lista e altera somente candidaturas da organizacao legal ativa;
+- `/gang` lista e altera somente candidaturas da gang ativa;
+- nao foi criado painel staff global de recrutamento nesta fase.
+
 ## Proposta de navegacao
 
 Separar o painel em duas camadas:
@@ -265,8 +284,9 @@ Cargos:
 
 Metas:
 
-- Criar meta quando permitido.
-- Lista de metas.
+- Cards de resumo no topo: metas ativas, progresso geral e criar meta.
+- Criar meta quando permitido por modal interna.
+- Lista de metas full width abaixo dos cards.
 - Progresso, alvo, periodo e status.
 
 Banco:

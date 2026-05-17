@@ -24,6 +24,7 @@ end
 local InviteRateLimit = {}
 local RemoveRateLimit = {}
 local GradeRateLimit = {}
+local LeaderRateLimit = {}
 
 local function rateLimited(bucket, src)
   local now = GetGameTimer()
@@ -117,15 +118,26 @@ end
 local function canViewMembers(src, orgCode)
   if isOwner(src) then return true end
 
+  if safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.view') == true then
+    return true
+  end
+
   if safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.manage') == true then
     return true
   end
 
-  if safeExport('mz_core', 'HasGlobalPermission', src, 'staff.panel.open') == true then
+  return safeExport('mz_core', 'CanOrg', src, orgCode, 'org.view') == true
+end
+
+local function canSetLeader(src, orgCode)
+  if isOwner(src) then return true end
+  if not orgCode then return false end
+
+  if safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.set_leader') == true then
     return true
   end
 
-  return safeExport('mz_core', 'CanOrg', src, orgCode, 'org.view') == true
+  return safeExport('mz_core', 'CanOrg', src, orgCode, 'staff.orgs.set_leader') == true
 end
 
 local function normalizeMember(row)
@@ -186,6 +198,7 @@ end)
 RegisterNetEvent('mz_org:server:inviteMember', function(requestId, payload)
   local src = source
   local orgCode = normalizeOrgCode(type(payload) == 'table' and payload.orgCode or nil)
+  local citizenid = normalizeCitizenId(type(payload) == 'table' and (payload.citizenid or payload.targetCitizenId or payload.passport) or nil)
   local targetId = normalizeTargetId(type(payload) == 'table' and (payload.targetId or payload.targetSource) or nil)
   local gradeLevel = normalizeGradeLevel(type(payload) == 'table' and payload.gradeLevel or nil)
   local gradeCode = normalizeGradeCode(type(payload) == 'table' and payload.gradeCode or nil)
@@ -200,8 +213,8 @@ RegisterNetEvent('mz_org:server:inviteMember', function(requestId, payload)
     return
   end
 
-  if not targetId then
-    sendResponse(src, requestId, fail('Player alvo invalido.'))
+  if not citizenid and not targetId then
+    sendResponse(src, requestId, fail('CitizenID do player alvo invalido.'))
     return
   end
 
@@ -218,16 +231,27 @@ RegisterNetEvent('mz_org:server:inviteMember', function(requestId, payload)
     }
   end
 
-  local result, dataOrErr = safeExport('mz_core', 'InviteOrgMember', src, orgCode, targetId, options)
+  local result, dataOrErr = nil, nil
+  if citizenid then
+    result, dataOrErr = safeExport('mz_core', 'InviteOrgMemberByCitizenId', src, orgCode, citizenid, options)
+  elseif Config and Config.Debug then
+    result, dataOrErr = safeExport('mz_core', 'InviteOrgMember', src, orgCode, targetId, options)
+  else
+    sendResponse(src, requestId, fail('CitizenID do player alvo invalido.'))
+    return
+  end
+
   if result ~= true then
     local message = 'Nao foi possivel convidar o membro.'
-    if dataOrErr == 'invalid_target' then message = 'Player alvo invalido ou offline.' end
+    if dataOrErr == 'invalid_target' then message = 'Player alvo invalido.' end
+    if dataOrErr == 'target_not_found' then message = 'Player nao encontrado.' end
     if dataOrErr == 'invalid_org' or dataOrErr == 'org_not_found' then message = 'Organizacao invalida.' end
     if dataOrErr == 'already_member' then message = 'O player ja e membro desta organizacao.' end
     if dataOrErr == 'forbidden' then message = 'Sem permissao para convidar membros.' end
     if dataOrErr == 'self_target' then message = 'Voce nao pode convidar a si mesmo.' end
     if dataOrErr == 'invalid_grade' then message = 'Cargo inicial invalido para esta organizacao.' end
     if dataOrErr == 'grade_not_allowed' then message = 'Voce nao pode convidar para este cargo.' end
+    if dataOrErr == 'leader_permission_required' then message = 'Voce nao tem permissao para alterar lideranca ou cargo maximo.' end
     if dataOrErr == 'grade_not_found' then message = 'Nenhum cargo inicial seguro foi encontrado.' end
     sendResponse(src, requestId, fail(message))
     return
@@ -265,6 +289,7 @@ RegisterNetEvent('mz_org:server:removeMember', function(requestId, payload)
     if dataOrErr == 'forbidden' then message = 'Sem permissao para remover membros.' end
     if dataOrErr == 'self_remove' then message = 'Voce nao pode remover a si mesmo.' end
     if dataOrErr == 'target_higher_or_equal' then message = 'Voce nao pode remover cargo igual ou superior.' end
+    if dataOrErr == 'leader_permission_required' then message = 'Voce nao tem permissao para alterar lideranca ou cargo maximo.' end
     if dataOrErr == 'protected_target' then message = 'Este membro esta em cargo protegido.' end
     sendResponse(src, requestId, fail(message))
     return
@@ -303,6 +328,7 @@ local function memberGradeAction(src, requestId, payload, action)
     if dataOrErr == 'self_action' then message = 'Voce nao pode alterar o proprio cargo.' end
     if dataOrErr == 'target_higher_or_equal' then message = 'Voce nao pode mexer em cargo igual ou superior.' end
     if dataOrErr == 'promotion_above_actor' then message = 'Voce nao pode promover para cargo igual ou superior ao seu.' end
+    if dataOrErr == 'leader_permission_required' then message = 'Voce nao tem permissao para alterar lideranca ou cargo maximo.' end
     if dataOrErr == 'max_grade' or dataOrErr == 'max_grade_reached' then message = 'O membro ja esta no cargo maximo.' end
     if dataOrErr == 'min_grade' or dataOrErr == 'min_grade_reached' then message = 'O membro ja esta no cargo minimo.' end
     if dataOrErr == 'protected_target' then message = 'Este membro esta em cargo protegido.' end
@@ -320,4 +346,58 @@ end)
 
 RegisterNetEvent('mz_org:server:demoteMember', function(requestId, payload)
   memberGradeAction(source, requestId, payload, 'demote')
+end)
+
+RegisterNetEvent('mz_org:server:setOrgLeader', function(requestId, payload)
+  local src = source
+  payload = type(payload) == 'table' and payload or {}
+
+  local orgCode = normalizeOrgCode(payload.orgCode)
+  local citizenid = normalizeCitizenId(payload.citizenid or payload.targetCitizenId)
+  local reason = nil
+
+  if type(payload.reason) == 'string' or type(payload.reason) == 'number' then
+    reason = tostring(payload.reason):gsub('^%s+', ''):gsub('%s+$', '')
+    if reason == '' then reason = nil end
+    if reason and #reason > 255 then reason = reason:sub(1, 255) end
+  end
+
+  if not orgCode then
+    sendResponse(src, requestId, fail('Organizacao invalida.'))
+    return
+  end
+
+  if not citizenid then
+    sendResponse(src, requestId, fail('Informe um CitizenID valido.'))
+    return
+  end
+
+  if not canSetLeader(src, orgCode) then
+    sendResponse(src, requestId, fail('Voce nao tem permissao para definir lideranca.'))
+    return
+  end
+
+  if rateLimited(LeaderRateLimit, src) then
+    sendResponse(src, requestId, fail('Aguarde alguns segundos e tente novamente.'))
+    return
+  end
+
+  local result, dataOrErr = safeExport('mz_core', 'SetOrgLeaderByCitizenId', src, orgCode, citizenid, {
+    reason = reason
+  })
+
+  if result ~= true then
+    local message = 'Nao foi possivel definir o lider.'
+    if dataOrErr == 'invalid_org' or dataOrErr == 'org_not_found' then message = 'Organizacao invalida.' end
+    if dataOrErr == 'invalid_target' then message = 'Informe um CitizenID valido.' end
+    if dataOrErr == 'target_not_found' then message = 'Player nao encontrado.' end
+    if dataOrErr == 'forbidden' then message = 'Voce nao tem permissao para definir lideranca.' end
+    if dataOrErr == 'top_grade_not_found' then message = 'Cargo maximo da organizacao nao encontrado.' end
+    if dataOrErr == 'set_leader_failed' then message = 'Nao foi possivel definir o lider.' end
+    if dataOrErr == 'rate_limited' then message = 'Aguarde alguns segundos e tente novamente.' end
+    sendResponse(src, requestId, fail(message))
+    return
+  end
+
+  sendResponse(src, requestId, ok(dataOrErr or {}))
 end)

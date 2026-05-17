@@ -140,6 +140,10 @@ RegisterNUICallback('members:demote', function(data, cb)
   sendServerRequest('mz_org:server:demoteMember', data, cb)
 end)
 
+RegisterNUICallback('members:setLeader', function(data, cb)
+  sendServerRequest('mz_org:server:setOrgLeader', data, cb)
+end)
+
 RegisterNUICallback('logs:list', function(data, cb)
   sendServerRequest('mz_org:server:listLogs', data, cb)
 end)
@@ -166,6 +170,22 @@ end)
 
 RegisterNUICallback('recruitment:get', function(data, cb)
   sendServerRequest('mz_org:server:getRecruitment', data, cb)
+end)
+
+RegisterNUICallback('recruitment:create', function(data, cb)
+  sendServerRequest('mz_org:server:createRecruitment', data, cb)
+end)
+
+RegisterNUICallback('recruitment:approve', function(data, cb)
+  sendServerRequest('mz_org:server:approveRecruitment', data, cb)
+end)
+
+RegisterNUICallback('recruitment:reject', function(data, cb)
+  sendServerRequest('mz_org:server:rejectRecruitment', data, cb)
+end)
+
+RegisterNUICallback('recruitment:cancel', function(data, cb)
+  sendServerRequest('mz_org:server:cancelRecruitment', data, cb)
 end)
 
 RegisterNUICallback('goals:list', function(data, cb)

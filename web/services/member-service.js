@@ -8,7 +8,19 @@
     });
   }
 
-  function inviteMember(orgCode, targetId, grade) {
+  function inviteMember(orgCode, citizenid, grade) {
+    if (!orgCode) return Promise.reject(new Error('Codigo da org ausente.'));
+    if (!citizenid) return Promise.reject(new Error('CitizenID do player alvo ausente.'));
+    var payload = { orgCode: orgCode, citizenid: citizenid };
+    if (grade && grade.gradeLevel) payload.gradeLevel = grade.gradeLevel;
+    if (grade && grade.gradeCode) payload.gradeCode = grade.gradeCode;
+
+    return window.MZOrgNui.callNuiData('members:invite', payload).then(function (data) {
+      return data || {};
+    });
+  }
+
+  function inviteMemberBySource(orgCode, targetId, grade) {
     if (!orgCode) return Promise.reject(new Error('Codigo da org ausente.'));
     if (!targetId) return Promise.reject(new Error('ID do player alvo ausente.'));
     var payload = { orgCode: orgCode, targetId: targetId };
@@ -44,11 +56,25 @@
     });
   }
 
+  function setOrgLeader(orgCode, citizenid, reason) {
+    if (!orgCode) return Promise.reject(new Error('Codigo da org ausente.'));
+    if (!citizenid) return Promise.reject(new Error('CitizenID do player ausente.'));
+    return window.MZOrgNui.callNuiData('members:setLeader', {
+      orgCode: orgCode,
+      citizenid: citizenid,
+      reason: reason || ''
+    }).then(function (data) {
+      return data || {};
+    });
+  }
+
   window.MZOrgMemberService = {
     listMembers: listMembers,
     inviteMember: inviteMember,
+    inviteMemberBySource: inviteMemberBySource,
     removeMember: removeMember,
     promoteMember: promoteMember,
-    demoteMember: demoteMember
+    demoteMember: demoteMember,
+    setOrgLeader: setOrgLeader
   };
 }());

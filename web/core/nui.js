@@ -117,7 +117,7 @@
     if (eventName === 'session:get') {
       window.setTimeout(function () {
         receiveSession({
-          user: { source: 1, name: 'Dev User', isOwner: true, globalPermissions: ['group.mz_owner'] },
+          user: { source: 1, name: 'Dev User', citizenid: 'DEV12345', isOwner: true, globalPermissions: ['group.mz_owner', 'staff.orgs.set_leader'] },
           orgs: [
             { code: 'police', name: 'Policia', type: 'legal', grade: 3, gradeCode: 'sargento', gradeName: 'Sargento', capabilities: ['org.view', 'account.view', 'logs.view', 'goals.manage'] },
             { code: 'mafia', name: 'Mafia', type: 'gang', grade: 4, gradeCode: 'lider', gradeName: 'Lider', capabilities: ['org.view', 'account.view', 'logs.view'] }
@@ -131,17 +131,24 @@
     if (eventName === 'orgs:list') return Promise.resolve({ ok: true, data: [] });
     if (eventName === 'orgs:get') return Promise.resolve({ ok: true, data: {} });
     if (eventName === 'members:list') return Promise.resolve({ ok: true, data: [] });
-    if (eventName === 'members:invite') return Promise.resolve({ ok: true, data: { orgCode: payload.orgCode, targetSource: payload.targetId, grade: payload.gradeLevel || 1, gradeCode: payload.gradeCode || 'recruta' } });
+    if (eventName === 'members:invite') return Promise.resolve({ ok: true, data: { orgCode: payload.orgCode, targetCitizenId: payload.citizenid, grade: payload.gradeLevel || 1, gradeCode: payload.gradeCode || 'recruta' } });
     if (eventName === 'members:remove') return Promise.resolve({ ok: true, data: { orgCode: payload.orgCode, targetCitizenId: payload.citizenid, removed: true } });
     if (eventName === 'members:promote') return Promise.resolve({ ok: true, data: { orgCode: payload.orgCode, targetCitizenId: payload.citizenid, action: 'promote', oldGrade: 1, newGrade: 2 } });
     if (eventName === 'members:demote') return Promise.resolve({ ok: true, data: { orgCode: payload.orgCode, targetCitizenId: payload.citizenid, action: 'demote', oldGrade: 2, newGrade: 1 } });
+    if (eventName === 'members:setLeader') return Promise.resolve({ ok: true, data: { orgCode: payload.orgCode, orgName: payload.orgCode, targetCitizenId: payload.citizenid, gradeLevel: 4, gradeCode: 'lider', gradeName: 'Lider' } });
     if (eventName === 'logs:list') return Promise.resolve({ ok: true, data: [] });
     if (eventName === 'org-bank:get') return Promise.resolve({ ok: true, data: { orgCode: 'police', balance: 0, currency: 'R$' } });
     if (eventName === 'org-bank:transactions') return Promise.resolve({ ok: true, data: [] });
     if (eventName === 'org-bank:deposit') return Promise.resolve({ ok: true, data: { orgCode: payload.orgCode, balance: Number(payload.amount) || 0, currency: 'R$' } });
     if (eventName === 'org-bank:withdraw') return Promise.resolve({ ok: true, data: { orgCode: payload.orgCode, balance: 0, currency: 'R$' } });
-    if (eventName === 'recruitment:list') return Promise.resolve({ ok: true, data: [] });
+    if (eventName === 'recruitment:list') return Promise.resolve({ ok: true, data: [
+      { id: 1, orgCode: payload.orgCode || 'police', candidateName: 'Candidato Dev', candidateCitizenId: 'DEV99881', status: 'pending', desiredGradeLevel: 1, note: 'Triagem inicial', createdAt: new Date().toISOString() }
+    ] });
     if (eventName === 'recruitment:get') return Promise.resolve({ ok: true, data: {} });
+    if (eventName === 'recruitment:create') return Promise.resolve({ ok: true, data: { id: Date.now(), orgCode: payload.orgCode, candidateCitizenId: payload.citizenid, status: 'pending', desiredGradeLevel: payload.desiredGradeLevel || null, note: payload.note || '', createdAt: new Date().toISOString() } });
+    if (eventName === 'recruitment:approve') return Promise.resolve({ ok: true, data: { recruitment: { id: payload.id, status: 'approved' } } });
+    if (eventName === 'recruitment:reject') return Promise.resolve({ ok: true, data: { id: payload.id, status: 'rejected' } });
+    if (eventName === 'recruitment:cancel') return Promise.resolve({ ok: true, data: { id: payload.id, status: 'cancelled' } });
     if (eventName === 'goals:list') return Promise.resolve({ ok: true, data: [] });
     if (eventName === 'goals:get') return Promise.resolve({ ok: true, data: {} });
     if (eventName === 'goals:create') return Promise.resolve({ ok: true, data: { id: Date.now(), orgCode: payload.orgCode, title: payload.title, type: payload.type || 'manual', status: 'active', target: payload.target || 1, progress: 0, progressPercent: 0 } });

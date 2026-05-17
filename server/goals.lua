@@ -108,11 +108,11 @@ end
 local function canViewGoals(src, orgCode)
   if isOwner(src) then return true end
 
-  if safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.manage') == true then
+  if safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.view') == true then
     return true
   end
 
-  if safeExport('mz_core', 'HasGlobalPermission', src, 'staff.panel.open') == true then
+  if safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.manage') == true then
     return true
   end
 
@@ -135,10 +135,6 @@ local function canManageGoals(src, orgCode)
   if isOwner(src) then return true end
 
   if safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.manage') == true then
-    return true
-  end
-
-  if safeExport('mz_core', 'HasGlobalPermission', src, 'staff.panel.open') == true then
     return true
   end
 

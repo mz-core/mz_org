@@ -21,6 +21,20 @@ local function sendResponse(src, requestId, response)
   TriggerClientEvent('mz_org:client:serverResponse', src, requestId, response)
 end
 
+local RecruitmentRateLimit = {}
+
+local function rateLimited(src, action)
+  local now = GetGameTimer()
+  local key = tostring(src) .. ':' .. tostring(action or 'default')
+  local last = RecruitmentRateLimit[key] or 0
+  if now - last < 2000 then
+    return true
+  end
+
+  RecruitmentRateLimit[key] = now
+  return false
+end
+
 local function normalizeString(value, maxLength)
   if type(value) ~= 'string' and type(value) ~= 'number' then return nil end
 
@@ -82,17 +96,15 @@ end
 local function canViewRecruitment(src, orgCode)
   if isOwner(src) then return true end
 
-  if safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.manage') == true then
-    return true
-  end
-
-  if safeExport('mz_core', 'HasGlobalPermission', src, 'staff.panel.open') == true then
-    return true
-  end
-
   if not orgCode then
-    -- Player comum sem orgCode fica limitado a candidaturas proprias futuras.
-    -- Como nao existe backend real nesta etapa, o retorno e vazio seguro.
+    return false
+  end
+
+  if safeExport('mz_core', 'CanOrg', src, orgCode, 'recruitment.view') == true then
+    return true
+  end
+
+  if safeExport('mz_core', 'CanOrg', src, orgCode, 'recruitment.manage') == true then
     return true
   end
 
@@ -100,11 +112,22 @@ local function canViewRecruitment(src, orgCode)
     return true
   end
 
-  if safeExport('mz_core', 'CanOrg', src, orgCode, 'recruitment.view') == true then
+  return safeExport('mz_core', 'CanOrg', src, orgCode, 'manage.members') == true
+end
+
+local function canManageRecruitment(src, orgCode)
+  if isOwner(src) then return true end
+  if not orgCode then return false end
+
+  if safeExport('mz_core', 'CanOrg', src, orgCode, 'recruitment.manage') == true then
     return true
   end
 
-  return safeExport('mz_core', 'CanOrg', src, orgCode, 'org.view') == true
+  if safeExport('mz_core', 'CanOrg', src, orgCode, 'members.invite') == true then
+    return true
+  end
+
+  return safeExport('mz_core', 'CanOrg', src, orgCode, 'manage.members') == true
 end
 
 local function normalizeFilters(payload)
@@ -128,13 +151,46 @@ local function normalizeRecruitmentRow(row)
     orgCode = row.orgCode or row.org_code,
     type = row.type,
     status = row.status,
-    candidateName = row.candidateName or row.candidate_name or row.name,
-    candidateCitizenId = row.candidateCitizenId or row.candidate_citizenid or row.citizenid,
+    candidateName = row.candidateName or row.targetName or row.target_name or row.candidate_name or row.name,
+    candidateCitizenId = row.candidateCitizenId or row.targetCitizenId or row.target_citizenid or row.candidate_citizenid or row.citizenid,
+    targetName = row.targetName or row.target_name or row.candidateName,
+    targetCitizenId = row.targetCitizenId or row.target_citizenid or row.candidateCitizenId,
+    desiredGradeLevel = row.desiredGradeLevel or row.desired_grade_level,
+    desiredGradeCode = row.desiredGradeCode or row.desired_grade_code,
+    note = row.note,
+    decisionNote = row.decisionNote or row.decision_note,
     createdAt = row.createdAt or row.created_at,
     updatedAt = row.updatedAt or row.updated_at,
-    message = row.message,
-    source = row.source
+    reviewedAt = row.reviewedAt or row.reviewed_at,
+    message = row.message or row.note,
+    source = nil
   }
+end
+
+local function translateError(err, fallback)
+  local messages = {
+    invalid_org = 'Organizacao invalida.',
+    org_not_found = 'Organizacao invalida.',
+    invalid_target = 'CitizenID do candidato invalido.',
+    target_not_found = 'Player nao encontrado.',
+    already_member = 'O player ja e membro desta organizacao.',
+    already_pending = 'Ja existe uma candidatura pendente para este CitizenID.',
+    invalid_recruitment = 'Candidatura invalida.',
+    recruitment_not_found = 'Candidatura nao encontrada.',
+    invalid_status = 'Esta candidatura nao esta pendente.',
+    forbidden = 'Sem permissao para gerenciar recrutamento.',
+    invalid_grade = 'Cargo inicial invalido.',
+    grade_not_found = 'Cargo inicial invalido.',
+    grade_not_allowed = 'Voce nao pode usar este cargo inicial.',
+    leader_permission_required = 'Voce nao tem permissao para alterar lideranca ou cargo maximo.',
+    approve_failed = 'Nao foi possivel aprovar a candidatura.',
+    reject_failed = 'Nao foi possivel recusar a candidatura.',
+    cancel_failed = 'Nao foi possivel arquivar a candidatura.',
+    player_not_loaded = 'Player nao carregado.',
+    rate_limited = 'Aguarde alguns segundos para tentar novamente.'
+  }
+
+  return messages[tostring(err or '')] or fallback or 'Nao foi possivel concluir a acao.'
 end
 
 RegisterNetEvent('mz_org:server:listRecruitment', function(requestId, payload)
@@ -146,12 +202,15 @@ RegisterNetEvent('mz_org:server:listRecruitment', function(requestId, payload)
     return
   end
 
-  -- Backend real de recrutamento ainda nao foi encontrado no mz_core/mz_org.
-  -- Mantemos contrato read-only pronto, sem criar tabelas ou acoes de escrita.
-  local rows = safeExport('mz_core', 'ListOrgRecruitment', src, filters)
+  local rows, err = safeExport('mz_core', 'ListOrgRecruitment', src, filters.orgCode, filters)
+  if rows == false then
+    sendResponse(src, requestId, fail(translateError(err, 'Nao foi possivel listar candidaturas.')))
+    return
+  end
+
   if type(rows) ~= 'table' then
-    debugPrint('ListOrgRecruitment indisponivel; retornando lista vazia segura.')
-    sendResponse(src, requestId, ok({}))
+    debugPrint('ListOrgRecruitment indisponivel.')
+    sendResponse(src, requestId, fail('Recrutamento indisponivel.'))
     return
   end
 
@@ -181,13 +240,138 @@ RegisterNetEvent('mz_org:server:getRecruitment', function(requestId, payload)
     return
   end
 
-  local row = safeExport('mz_core', 'GetOrgRecruitment', src, id)
+  local row, err = safeExport('mz_core', 'GetOrgRecruitment', src, id)
+  if row == false then
+    sendResponse(src, requestId, fail(translateError(err, 'Nao foi possivel carregar a candidatura.')))
+    return
+  end
+
   local item = normalizeRecruitmentRow(row)
   if not item then
-    debugPrint('GetOrgRecruitment indisponivel; retornando detalhe vazio seguro.')
-    sendResponse(src, requestId, ok({}))
+    debugPrint('GetOrgRecruitment indisponivel.')
+    sendResponse(src, requestId, fail('Candidatura nao encontrada.'))
     return
   end
 
   sendResponse(src, requestId, ok(item))
+end)
+
+RegisterNetEvent('mz_org:server:createRecruitment', function(requestId, payload)
+  local src = source
+  payload = type(payload) == 'table' and payload or {}
+
+  local orgCode = normalizeString(payload.orgCode, 48)
+  local citizenid = normalizeString(payload.citizenid or payload.targetCitizenId or payload.passport, 64)
+  local desiredGradeLevel = payload.desiredGradeLevel or payload.gradeLevel
+
+  if not orgCode then
+    sendResponse(src, requestId, fail('Organizacao invalida.'))
+    return
+  end
+
+  if not citizenid then
+    sendResponse(src, requestId, fail('CitizenID do candidato invalido.'))
+    return
+  end
+
+  if not canManageRecruitment(src, orgCode) then
+    sendResponse(src, requestId, fail('Sem permissao para gerenciar recrutamento.'))
+    return
+  end
+
+  if rateLimited(src, 'create') then
+    sendResponse(src, requestId, fail(translateError('rate_limited')))
+    return
+  end
+
+  local result, dataOrErr = safeExport('mz_core', 'CreateOrgRecruitment', src, orgCode, {
+    citizenid = citizenid,
+    desiredGradeLevel = desiredGradeLevel,
+    desiredGradeCode = normalizeString(payload.desiredGradeCode or payload.gradeCode, 64),
+    note = normalizeString(payload.note, 1000)
+  })
+
+  if result ~= true then
+    sendResponse(src, requestId, fail(translateError(dataOrErr, 'Nao foi possivel criar a candidatura.')))
+    return
+  end
+
+  sendResponse(src, requestId, ok(normalizeRecruitmentRow(dataOrErr) or dataOrErr or {}))
+end)
+
+RegisterNetEvent('mz_org:server:approveRecruitment', function(requestId, payload)
+  local src = source
+  payload = type(payload) == 'table' and payload or {}
+  local id = normalizeNumber(payload.id, 0, 1, nil)
+
+  if not id or id <= 0 then
+    sendResponse(src, requestId, fail('Candidatura invalida.'))
+    return
+  end
+
+  if rateLimited(src, 'approve') then
+    sendResponse(src, requestId, fail(translateError('rate_limited')))
+    return
+  end
+
+  local result, dataOrErr = safeExport('mz_core', 'ApproveOrgRecruitment', src, id, {
+    gradeLevel = payload.gradeLevel,
+    gradeCode = normalizeString(payload.gradeCode, 64),
+    note = normalizeString(payload.note, 1000)
+  })
+
+  if result ~= true then
+    sendResponse(src, requestId, fail(translateError(dataOrErr, 'Nao foi possivel aprovar a candidatura.')))
+    return
+  end
+
+  sendResponse(src, requestId, ok(dataOrErr or {}))
+end)
+
+RegisterNetEvent('mz_org:server:rejectRecruitment', function(requestId, payload)
+  local src = source
+  payload = type(payload) == 'table' and payload or {}
+  local id = normalizeNumber(payload.id, 0, 1, nil)
+
+  if not id or id <= 0 then
+    sendResponse(src, requestId, fail('Candidatura invalida.'))
+    return
+  end
+
+  if rateLimited(src, 'reject') then
+    sendResponse(src, requestId, fail(translateError('rate_limited')))
+    return
+  end
+
+  local result, dataOrErr = safeExport('mz_core', 'RejectOrgRecruitment', src, id, normalizeString(payload.reason or payload.note, 1000))
+  if result ~= true then
+    sendResponse(src, requestId, fail(translateError(dataOrErr, 'Nao foi possivel recusar a candidatura.')))
+    return
+  end
+
+  sendResponse(src, requestId, ok(normalizeRecruitmentRow(dataOrErr) or dataOrErr or {}))
+end)
+
+RegisterNetEvent('mz_org:server:cancelRecruitment', function(requestId, payload)
+  local src = source
+  payload = type(payload) == 'table' and payload or {}
+  local id = normalizeNumber(payload.id, 0, 1, nil)
+
+  if not id or id <= 0 then
+    sendResponse(src, requestId, fail('Candidatura invalida.'))
+    return
+  end
+
+  if rateLimited(src, 'cancel') then
+    sendResponse(src, requestId, fail(translateError('rate_limited')))
+    return
+  end
+
+  local result, dataOrErr = safeExport('mz_core', 'CancelOrgRecruitment', src, id, normalizeString(payload.reason or payload.note, 1000))
+  if result ~= true then
+    sendResponse(src, requestId, fail(translateError(dataOrErr, 'Nao foi possivel arquivar a candidatura.')))
+    return
+  end
+
+  sendResponse(src, requestId, ok(normalizeRecruitmentRow(dataOrErr) or dataOrErr or {}))
 end)

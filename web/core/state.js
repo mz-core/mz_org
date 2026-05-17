@@ -81,9 +81,13 @@
       loadedKey: ''
     },
     logs: { loading: false, loaded: false, loadedKey: '', error: null, data: [], filters: { category: 'all', severity: 'all', org: 'all', search: '' } },
-    recruitment: { loading: false, loaded: false, loadedKey: '', error: null, data: [], detail: null },
+    recruitment: { loading: false, loaded: false, loadedKey: '', error: null, data: [], detail: null, actionLoading: false, actionMessage: null, actionError: null },
     goals: { loading: false, loaded: false, loadedKey: '', error: null, data: [], detail: null, createLoading: false, createMessage: null, createError: null },
+    recruitmentModal: { open: false, mode: 'create', id: null, citizenid: '', gradeLevel: '', note: '', loading: false, error: null },
+    goalModal: { open: false, title: '', type: 'manual', target: 1, startsAt: '', endsAt: '', description: '', loading: false, error: null },
     bankModal: { open: false, type: null, amount: '', reason: '', loading: false, error: null },
+    memberModal: { open: false, citizenid: '', gradeLevel: '', gradeCode: '', loading: false, error: null },
+    staffLeader: { orgCode: '', citizenid: '', reason: '', loading: false, message: null, error: null },
     cache: { orgs: null, logs: null, bank: {}, accessByOrg: {} },
     sidebarCollapsed: false
   };
@@ -105,6 +109,23 @@
     state.bankModal.reason = '';
     state.bankModal.loading = false;
     state.bankModal.error = null;
+    state.recruitmentModal.open = false;
+    state.recruitmentModal.mode = 'create';
+    state.recruitmentModal.id = null;
+    state.recruitmentModal.citizenid = '';
+    state.recruitmentModal.gradeLevel = '';
+    state.recruitmentModal.note = '';
+    state.recruitmentModal.loading = false;
+    state.recruitmentModal.error = null;
+    state.recruitment.actionLoading = false;
+    state.recruitment.actionMessage = null;
+    state.recruitment.actionError = null;
+    state.memberModal.open = false;
+    state.memberModal.citizenid = '';
+    state.memberModal.gradeLevel = '';
+    state.memberModal.gradeCode = '';
+    state.memberModal.loading = false;
+    state.memberModal.error = null;
     state.orgView.inviteLoading = false;
     state.orgView.inviteMessage = null;
     state.orgView.inviteError = null;

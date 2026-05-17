@@ -11,26 +11,29 @@ O `mz_org` é interface NUI. O `mz_core` é a fonte real de dados, permissões, 
 
 ## Capabilities revisadas
 
-Capabilities usadas atualmente pelo painel e/ou core:
+Catalogo oficial usado pelo `mz_org`/`mz_core`:
 
-- `org.view`
-- `members.invite`
-- `members.kick`
-- `members.remove`
-- `members.promote`
-- `members.demote`
-- `manage.members`
-- `account.view`
-- `goals.view`
-- `goals.manage`
-- `manage.goals`
-- `logs.view`
-- `manage.permissions`
-- `staff.panel.open`
-- `staff.orgs.manage`
-- `staff.logs.view`
+- Org geral: `org.view`.
+- Membros: `members.view`, `members.invite`, `members.remove`, `members.promote`, `members.demote`, `members.set_leader`, `manage.members`.
+- Banco: `account.view`, `account.deposit`, `account.withdraw`, `account.manage`.
+- Metas: `goals.view`, `goals.manage`.
+- Recrutamento: `recruitment.view`, `recruitment.manage`.
+- Logs: `logs.view`.
+- Staff/admin: `staff.panel.open`, `staff.orgs.view`, `staff.orgs.manage`, `staff.orgs.set_leader`, `staff.members.invite`, `staff.members.remove`, `staff.members.promote`, `staff.members.demote`, `staff.staff.manage`, `staff.logs.view`.
 
-`members.remove` e `manage.goals` foram adicionadas ao catalogo compartilhado do `mz_org` para alinhar com as validacoes atuais. Os seeds reais ainda podem precisar receber essas capabilities em cargos apropriados durante uma fase propria de balanceamento/permissoes.
+Aliases legados mantidos por compatibilidade:
+
+- `members.kick` continua fallback de `members.remove`.
+- `manage.goals` continua fallback de `goals.manage`.
+- `manage.account` continua fallback de `account.manage`.
+- `manage.permissions` continua usado para consulta do modelo de acesso/cargos.
+
+Regras importantes:
+
+- `staff.panel.open` abre/identifica o painel staff, mas nao autoriza operacoes de membros, banco, metas ou lideranca por si so.
+- `staff.orgs.view` permite consulta administrativa de orgs.
+- `staff.orgs.manage` permite gestao comum, mas nao substitui `staff.orgs.set_leader`.
+- Cargo maximo/top grade exige owner ACE `group.mz_owner`, `members.set_leader` ou `staff.orgs.set_leader`.
 
 ## Exports usados do `mz_core`
 
@@ -47,12 +50,20 @@ Capabilities usadas atualmente pelo painel e/ou core:
 - `ListOrgAccountTransactions(source, orgCode, filters)`
 - `GetOrgAccessModel(source, orgCode)`
 - `InviteOrgMember(source, orgCode, targetSource, options)`
+- `InviteOrgMemberByCitizenId(source, orgCode, targetCitizenId, options)`
 - `RemoveOrgMember(source, orgCode, targetCitizenId)`
 - `PromoteOrgMemberSecure(source, orgCode, targetCitizenId)`
 - `DemoteOrgMemberSecure(source, orgCode, targetCitizenId)`
+- `SetOrgLeaderByCitizenId(source, orgCode, targetCitizenId, options)`
 - `ListOrgGoals(source, filters)`
 - `GetOrgGoal(source, goalId)`
 - `CreateOrgGoal(source, orgCode, payload)`
+- `CreateOrgRecruitment(source, orgCode, payload)`
+- `ListOrgRecruitment(source, orgCode, filters)`
+- `GetOrgRecruitment(source, recruitmentId)`
+- `ApproveOrgRecruitment(source, recruitmentId, options)`
+- `RejectOrgRecruitment(source, recruitmentId, reason)`
+- `CancelOrgRecruitment(source, recruitmentId, reason)`
 
 ## Sessão esperada
 
@@ -104,6 +115,10 @@ Todos retornam:
 - `org-bank:withdraw`
 - `recruitment:list`
 - `recruitment:get`
+- `recruitment:create`
+- `recruitment:approve`
+- `recruitment:reject`
+- `recruitment:cancel`
 - `goals:list`
 - `goals:get`
 - `goals:create`
@@ -112,6 +127,116 @@ Todos retornam:
 - `members:remove`
 - `members:promote`
 - `members:demote`
+- `members:setLeader`
+
+### Staff minimo: definir lider
+
+Callback NUI:
+
+```lua
+members:setLeader {
+  orgCode = "mafia",
+  citizenid = "VKWR5Y9Y",
+  reason = "opcional"
+}
+```
+
+Export usado:
+
+```lua
+exports['mz_core']:SetOrgLeaderByCitizenId(source, orgCode, targetCitizenId, {
+  reason = "opcional"
+})
+```
+
+Regras:
+
+- a NUI envia somente `orgCode`, `citizenid` e `reason`;
+- o `source` confiavel e o `source` real do evento/server;
+- o core calcula a top grade real como a maior `level` em `mz_org_grades`;
+- se o alvo ja for membro ativo da org, o core atualiza a grade para top grade;
+- se o alvo nao for membro ativo, o core adiciona o player na top grade;
+- funciona com alvo offline se o `citizenid` existir em `mz_players`;
+- exige owner ACE `group.mz_owner` ou `staff.orgs.set_leader`;
+- `staff.panel.open`, `staff.orgs.view` e `staff.orgs.manage` sem `staff.orgs.set_leader` nao autorizam a acao;
+- esta fase adiciona apenas um card manual no `/staff`, nao um painel staff global completo.
+
+Erros esperados:
+
+- `invalid_org`
+- `invalid_target`
+- `target_not_found`
+- `forbidden`
+- `top_grade_not_found`
+- `set_leader_failed`
+- `rate_limited`
+
+Logs:
+
+- sucesso: `org.member.set_leader`;
+- bloqueio: `org.member.set_leader.blocked`.
+
+### Recrutamento/candidaturas
+
+Persistencia no core: tabela `mz_org_recruitment`, autocriada pelo `mz_core/server/prepare.lua`.
+
+Status suportados:
+
+- `pending`
+- `approved`
+- `rejected`
+- `cancelled`
+
+Callbacks:
+
+```lua
+-- listar candidaturas da org ativa
+recruitment:list {
+  orgCode = "police",
+  status = "pending", -- opcional
+  search = "VKWR", -- opcional
+  limit = 50,
+  offset = 0
+}
+
+-- criar registro de candidatura
+recruitment:create {
+  orgCode = "police",
+  citizenid = "VKWR5Y9Y",
+  desiredGradeLevel = 1, -- opcional
+  note = "opcional"
+}
+
+-- aprovar
+recruitment:approve {
+  id = 123,
+  gradeLevel = 1, -- opcional; sobrescreve a grade desejada
+  note = "opcional"
+}
+
+-- recusar / arquivar
+recruitment:reject { id = 123, reason = "opcional" }
+recruitment:cancel { id = 123, reason = "opcional" }
+```
+
+Permissoes:
+
+- visualizar: owner ACE ou `CanOrg(source, orgCode, 'recruitment.view'|'recruitment.manage'|'members.invite'|'manage.members')`;
+- criar/aprovar/recusar/arquivar: owner ACE ou `CanOrg(source, orgCode, 'recruitment.manage'|'members.invite'|'manage.members')`;
+- `staff.panel.open` nao concede poder operacional;
+- top grade/lideranca continua exigindo owner ACE, `members.set_leader` ou `staff.orgs.set_leader`.
+
+Regras de seguranca:
+
+- o `source` usado e sempre o `source` real do evento server;
+- a NUI nao envia actor, cargo real, permissao real nem `source` confiavel;
+- o identificador do candidato e `citizenid`;
+- criar candidatura valida se o `citizenid` existe em `mz_players`;
+- apenas uma candidatura `pending` por `orgCode + citizenid`;
+- aprovar chama o fluxo real de adicao por `citizenid`, cria membro na org ativa e muda o status para `approved`;
+- recusar muda o status para `rejected`;
+- arquivar muda o status para `cancelled`;
+- nao existe aceite pelo player nesta fase.
 
 ### Banco da organizacao
 
@@ -155,8 +280,8 @@ exports['mz_core']:ListOrgAccountTransactions(source, orgCode, filters)
 Permissoes server-side:
 
 - owner ACE `group.mz_owner` pode operar;
-- deposito exige `account.deposit` ou `account.manage`;
-- saque exige `account.withdraw` ou `account.manage`;
+- deposito exige `account.deposit` ou `account.manage` (`manage.account` segue como alias legado);
+- saque exige `account.withdraw` ou `account.manage` (`manage.account` segue como alias legado);
 - extrato usa a regra de visualizacao da conta, incluindo `account.view`.
 
 Persistencia:
@@ -197,7 +322,7 @@ Erros principais:
 { id = "123", orgCode = "police" }
 ```
 
-Campos esperados quando houver backend real:
+Campos retornados:
 
 ```lua
 {
@@ -210,20 +335,19 @@ Campos esperados quando houver backend real:
   createdAt = "2026-05-13 12:00:00",
   updatedAt = "2026-05-13 12:00:00",
   message = "texto seguro",
-  source = "future"
+  desiredGradeLevel = 1,
+  desiredGradeCode = "recruta"
 }
 ```
-
-Nesta etapa nao foi encontrada fonte real de recrutamento no `mz_core`. O `mz_org` tenta reaproveitar exports futuros `ListOrgRecruitment(source, filters)` e `GetOrgRecruitment(source, id)` se existirem; caso contrario retorna lista/detalhe vazio de forma segura.
 
 Permissao server-side:
 
 - owner com `group.mz_owner`;
-- staff com `staff.orgs.manage` ou `staff.panel.open`;
-- membro/lider autorizado por `CanOrg(source, orgCode, 'members.invite')`, `CanOrg(source, orgCode, 'recruitment.view')` ou fallback `CanOrg(source, orgCode, 'org.view')`;
-- player comum sem orgCode fica limitado a candidaturas proprias futuras, atualmente vazio seguro.
+- membro/lider autorizado por `CanOrg(source, orgCode, 'recruitment.view')`, `CanOrg(source, orgCode, 'recruitment.manage')`, `CanOrg(source, orgCode, 'members.invite')` ou `CanOrg(source, orgCode, 'manage.members')`;
+- staff global sem permissao na org ativa nao aprova nem recusa recrutamento;
+- player comum sem `orgCode` nao tem fluxo publico nesta fase.
 
-Aprovar, recusar e fluxo completo de candidatura continuam pendentes. A acao direta `members:invite` existe em contrato separado e exige validacao server-side, logs e rate limit.
+Aprovar, recusar e arquivar usam os exports reais do `mz_core`; aprovar adiciona o candidato como membro real da org ativa.
 
 ### Metas read-only
 
@@ -275,10 +399,26 @@ exports['mz_core']:GetOrgGoal(source, id)
 Permissao server-side:
 
 - owner com `group.mz_owner`;
-- staff com `staff.orgs.manage` ou `staff.panel.open`;
+- staff com `staff.orgs.view` ou `staff.orgs.manage`;
 - membro/lider autorizado por `CanOrg(source, orgCode, 'goals.view')`, `CanOrg(source, orgCode, 'goals.manage')` ou fallback `CanOrg(source, orgCode, 'org.view')`.
 
 Editar, deletar, concluir, alterar progresso, ranking, recompensas e logs de metas continuam pendentes e precisam de validacao server-side.
+
+### Progresso e conclusao de metas - plano futuro
+
+Ainda nao foi implementado callback de progresso/conclusao. Opcoes recomendadas:
+
+- Progresso manual: lider/staff autorizado atualiza `progress` por callback futuro `goals:updateProgress`, com validacao por `source`, org ativa, capability e logs.
+- Progresso por membro: cada membro registra contribuicoes individuais em tabela propria, permitindo ranking e auditoria por pessoa.
+- Progresso automatico: outros resources chamam export/event seguro no `mz_core`, por exemplo prisao efetuada, patrulha iniciada ou atendimento concluido.
+
+Recomendacao de MVP:
+
+1. Comecar com progresso manual seguro.
+2. Depois adicionar contribuicoes por membro.
+3. Por ultimo integrar progresso automatico por exports/events.
+
+Conclusao de meta deve ser calculada no servidor quando `progress >= target` ou acionada por staff/lider autorizado, sempre com log de auditoria e sem recompensa/pagamento automatico nesta fase.
 
 ### Criar meta
 
@@ -407,7 +547,7 @@ Origem real no `mz_core`:
 Permissao server-side:
 
 - owner com `group.mz_owner`;
-- staff com `staff.orgs.manage` ou `staff.panel.open`;
+- staff com `staff.orgs.view` ou `staff.orgs.manage`;
 - membro/lider autorizado por `CanOrg(source, orgCode, 'manage.permissions')`, `CanOrg(source, orgCode, 'manage.members')` ou fallback `CanOrg(source, orgCode, 'org.view')`.
 
 Criar, editar, deletar cargos, alterar capability, escolher grade manualmente fora do fluxo de convite e aplicar overrides continuam pendentes.
@@ -421,19 +561,21 @@ Payload aceito pela NUI:
 ```lua
 {
   orgCode = "police",
-  targetId = 12,
+  citizenid = "ABC123",
   gradeLevel = 1,
   gradeCode = "recruta"
 }
 ```
 
-`gradeLevel` e `gradeCode` sao opcionais. Se nenhum deles for enviado, o core mantem o comportamento original e usa a menor grade segura da organizacao.
+`citizenid` e o identificador fixo principal do `mz_core` nesta fase. `gradeLevel` e `gradeCode` sao opcionais. Se nenhum deles for enviado, o core mantem o comportamento original e usa a menor grade segura da organizacao.
 
 O `source` do autor nunca vem do frontend. O `mz_org` usa o `source` real do evento server-side e chama:
 
 ```lua
-exports['mz_core']:InviteOrgMember(source, orgCode, targetSource, options)
+exports['mz_core']:InviteOrgMemberByCitizenId(source, orgCode, targetCitizenId, options)
 ```
+
+O callback ainda aceita `targetId` apenas como fallback de debug quando `Config.Debug` esta ativo no `mz_org`; a UI normal nao envia source/ID online.
 
 Resposta de sucesso:
 
@@ -442,7 +584,6 @@ Resposta de sucesso:
   ok = true,
   data = {
     orgCode = "police",
-    targetSource = 12,
     targetCitizenId = "ABC123",
     grade = 1,
     gradeCode = "recruta",
@@ -453,30 +594,34 @@ Resposta de sucesso:
 
 Erros possiveis:
 
-- `invalid_target`: player alvo invalido ou offline.
+- `invalid_target`: citizenid invalido.
+- `target_not_found`: citizenid nao encontrado em `mz_players`.
 - `invalid_org`: organizacao invalida.
 - `already_member`: player ja e membro ativo da org.
 - `forbidden`: autor sem permissao.
 - `self_target`: autor tentando convidar a si mesmo.
 - `invalid_grade`: grade enviada nao existe na org ou payload de grade invalido.
 - `grade_not_allowed`: autor nao pode convidar para a grade escolhida.
+- `leader_permission_required`: convite para cargo maximo exige permissao de lideranca.
 - `grade_not_found`: org sem grade inicial segura.
 
 Validacoes server-side:
 
-- `targetSource` deve ser numero valido e online.
-- `targetSource` nao pode ser igual ao autor.
+- `targetCitizenId` deve existir em `mz_players`.
+- `targetCitizenId` nao pode ser o citizenid do autor.
 - org deve existir.
 - autor precisa ser owner, staff autorizado ou `CanOrg(source, orgCode, 'members.invite')`.
 - se grade nao for enviada, grade inicial e a menor grade real da org.
 - se grade for enviada, ela precisa existir na propria org.
-- owner/staff autorizado pode escolher qualquer grade existente.
+- top grade e a grade com maior `level` da org.
+- convite direto para top grade exige owner ACE `group.mz_owner`, `members.set_leader` ou `staff.orgs.set_leader`.
+- `staff.panel.open` nao autoriza convite para lideranca/cargo maximo.
 - membro comum so pode escolher grade abaixo da propria.
 - a NUI nao envia grade livre; o seletor visual usa `org-access:get`, mas o server valida novamente.
 - existe rate limit simples no `mz_org` para evitar spam.
 - o `mz_core` registra auditoria de sucesso e tentativas bloqueadas com `MZLogService.createDetailed`, incluindo grade inicial, code e nome quando disponiveis.
 
-Nao foram criadas na etapa de convite: editar cargo, editar permissao, convite offline ou input livre de grade. Remocao, promocao e rebaixamento ficam documentados nas secoes proprias.
+O convite por `citizenid` consegue adicionar players offline desde que ja exista registro em `mz_players`; nao foi criado fluxo persistido de convite pendente/aceite. Nao foram criadas nesta etapa: editar cargo, editar permissao ou input livre de grade. Remocao, promocao e rebaixamento ficam documentados nas secoes proprias.
 
 ### Promover e rebaixar membro
 
@@ -526,23 +671,30 @@ Erros possiveis:
 - `self_action`: autor tentando alterar o proprio cargo.
 - `target_higher_or_equal`: cargo do alvo e igual ou superior ao autor.
 - `promotion_above_actor`: promocao colocaria o alvo em cargo igual ou superior ao autor.
+- `leader_permission_required`: promocao/rebaixamento envolvendo cargo maximo exige permissao de lideranca.
 - `max_grade`: alvo ja esta na maior grade real.
 - `min_grade`: alvo ja esta na menor grade real.
-- `protected_target`: alvo esta em cargo protegido e o autor nao e owner/staff.
 - `grade_not_found`: cargo atual nao foi encontrado.
 
 Validacoes server-side:
 
 - target deve existir e ser membro ativo da org.
+- target nao pode ser o proprio autor; nesse caso o core retorna `self_action`.
 - autor precisa ser owner, staff autorizado ou capability especifica.
 - promover usa `members.promote` ou fallback temporario `manage.members`.
 - rebaixar usa `members.demote` ou fallback temporario `manage.members`.
 - a NUI nao escolhe grade; o core calcula a proxima/anterior grade pela lista real `mz_org_grades`.
+- top grade e a grade com maior `level` da org.
+- promover alguem para top grade exige owner ACE `group.mz_owner`, `members.set_leader` ou `staff.orgs.set_leader`.
+- rebaixar alguem que esta em top grade exige owner ACE `group.mz_owner`, `members.set_leader` ou `staff.orgs.set_leader`.
 - membro comum so altera cargo abaixo do seu.
 - membro comum nao promove target para cargo igual ou superior ao proprio.
-- owner/staff podem ignorar regra de hierarquia, mas self action continua bloqueada.
+- staff com `staff.orgs.manage` pode gerenciar membros, mas nao altera lideranca/top grade sem `staff.orgs.set_leader`.
+- `staff.panel.open` nao autoriza mutacao de lideranca.
+- owner pode tudo, mas self action continua bloqueada.
 - existe rate limit simples no `mz_org` para evitar spam.
 - o `mz_core` registra auditoria de sucesso e tentativas bloqueadas com `MZLogService.createDetailed`.
+- a UI oculta os botoes de promover/rebaixar/remover na linha do proprio usuario e mostra badge `Voce`; se a acao for forcada, o server continua bloqueando e a UI limpa o loading no `finally`.
 
 Nao foram criadas nesta etapa: escolha manual de grade, editar cargo, editar permissao, criar/deletar cargo ou qualquer acao financeira.
 
@@ -586,18 +738,23 @@ Erros possiveis:
 - `forbidden`: autor sem permissao.
 - `self_remove`: autor tentando remover a si mesmo.
 - `target_higher_or_equal`: cargo do alvo e igual ou superior ao autor.
-- `protected_target`: alvo esta na grade maxima/protegida e o autor nao e owner.
+- `leader_permission_required`: remover cargo maximo exige permissao de lideranca.
+- `protected_target`: alvo esta na grade maxima/protegida e o autor nao tem permissao adequada.
 
 Validacoes server-side:
 
 - target deve existir e ser membro ativo da org.
+- target nao pode ser o proprio autor; nesse caso o core retorna `self_remove`.
 - autor precisa ser owner, staff autorizado ou capability de remocao.
 - a ordem de capability e `members.remove` futura, `members.kick` atual e `manage.members` como fallback de gestao.
+- remover top grade exige owner ACE `group.mz_owner`, `members.set_leader` ou `staff.orgs.set_leader`.
+- staff com `staff.orgs.manage` pode remover membros, mas nao remove top grade sem `staff.orgs.set_leader`.
+- `staff.panel.open` nao autoriza mutacao de lideranca.
 - owner pode remover cargo protegido, mas nao pode remover a si mesmo.
-- staff pode remover, exceto self e cargo protegido.
 - membro da org so pode remover cargo abaixo do seu.
 - existe rate limit simples no `mz_org` para evitar spam.
 - o `mz_core` registra auditoria de sucesso e tentativas bloqueadas com `MZLogService.createDetailed`.
+- a UI oculta o botao de remover na linha do proprio usuario; se a acao for forcada, o server continua bloqueando e a UI limpa o loading no `finally`.
 
 Nao foram criadas nesta etapa: editar cargo, editar permissao, escolher grade manualmente ou remocao offline.
 

@@ -11,6 +11,7 @@
       user: {
         source: user.source || 0,
         name: user.name || 'Player',
+        citizenid: user.citizenid || user.citizenId || user.citizen_id || '',
         isOwner: user.isOwner === true,
         globalPermissions: Array.isArray(user.globalPermissions) ? user.globalPermissions : []
       },

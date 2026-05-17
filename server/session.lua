@@ -152,7 +152,14 @@ local function buildGlobalPermissions(src, owner, orgs)
 
   if owner then
     addUnique(permissions, Config.OwnerAce)
+    addUnique(permissions, 'staff.orgs.view')
     addUnique(permissions, 'staff.orgs.manage')
+    addUnique(permissions, 'staff.orgs.set_leader')
+    addUnique(permissions, 'staff.staff.manage')
+    addUnique(permissions, 'staff.members.invite')
+    addUnique(permissions, 'staff.members.remove')
+    addUnique(permissions, 'staff.members.promote')
+    addUnique(permissions, 'staff.members.demote')
     addUnique(permissions, 'staff.players.manage')
     addUnique(permissions, 'staff.logs.view')
     return permissions
@@ -160,7 +167,14 @@ local function buildGlobalPermissions(src, owner, orgs)
 
   local candidates = {
     'staff.panel.open',
+    'staff.orgs.view',
     'staff.orgs.manage',
+    'staff.orgs.set_leader',
+    'staff.staff.manage',
+    'staff.members.invite',
+    'staff.members.remove',
+    'staff.members.promote',
+    'staff.members.demote',
     'staff.players.manage',
     'staff.logs.view'
   }
@@ -215,6 +229,7 @@ local function buildModules(owner, orgs, globalPermissions)
   local staffAllowed = owner
     or hasGlobalPermission(globalPermissions, 'staff.panel.open')
     or hasGlobalPermission(globalPermissions, 'staff.orgs.manage')
+    or hasGlobalPermission(globalPermissions, 'staff.orgs.set_leader')
     or hasGlobalPermission(globalPermissions, 'staff.logs.view')
 
   addUnique(modules, 'dashboard')
@@ -279,6 +294,7 @@ local function buildMockSession(src)
     user = {
       source = src,
       name = GetPlayerName(src) or ('ID ' .. tostring(src)),
+      citizenid = nil,
       isOwner = owner,
       globalPermissions = owner and {
         Config.OwnerAce,
@@ -337,6 +353,7 @@ local function buildRealSession(src)
       user = {
         source = src or 0,
         name = 'Unknown',
+        citizenid = nil,
         isOwner = false,
         globalPermissions = {}
       },
@@ -375,6 +392,7 @@ local function buildRealSession(src)
     user = {
       source = src,
       name = getPlayerDisplayName(src, player),
+      citizenid = player and player.citizenid and tostring(player.citizenid) or nil,
       isOwner = owner,
       globalPermissions = globalPermissions
     },

@@ -129,8 +129,8 @@ end
 local function canManageOrgs(src)
   if isOwner(src) then return true end
 
-  return safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.manage') == true
-    or safeExport('mz_core', 'HasGlobalPermission', src, 'staff.panel.open') == true
+  return safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.view') == true
+    or safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.manage') == true
 end
 
 local function getPlayerContext(src)

@@ -66,6 +66,7 @@
     'members.kick': 'Remover membros',
     'members.promote': 'Promover membros',
     'members.demote': 'Rebaixar membros',
+    'members.set_leader': 'Alterar lideranca',
     'manage.members': 'Gerenciar membros',
     'manage.team': 'Gerenciar equipe',
     'goals.view': 'Ver metas',
@@ -76,6 +77,7 @@
     'account.withdraw': 'Sacar do banco da organizacao',
     'account.manage': 'Gerenciar banco da organizacao',
     'manage.account': 'Gerenciar banco',
+    'account.transfer': 'Transferir pelo banco',
     'logs.view': 'Ver auditoria',
     'manage.permissions': 'Gerenciar permissoes',
     'org.settings': 'Configurar organizacao',
@@ -86,12 +88,21 @@
     'recruitment.manage': 'Gerenciar recrutamento',
     'reports.approve': 'Aprovar relatorios',
     'staff.panel.open': 'Abrir painel staff',
+    'staff.orgs.view': 'Consultar orgs',
     'staff.report.view': 'Ver reports',
     'staff.kick': 'Expulsar jogador',
     'staff.spectate': 'Spectar jogador',
     'staff.ban': 'Banir jogador',
     'staff.teleport': 'Teleportar',
     'staff.orgs.manage': 'Gerenciar orgs',
+    'staff.orgs.set_leader': 'Definir liderancas',
+    'staff.staff.manage': 'Gerenciar staff',
+    'staff.logs.view': 'Ver logs staff',
+    'staff.players.manage': 'Gerenciar players',
+    'staff.members.invite': 'Convidar staff',
+    'staff.members.remove': 'Remover staff',
+    'staff.members.promote': 'Promover staff',
+    'staff.members.demote': 'Rebaixar staff',
     'vip.chat.tag': 'Tag no chat',
     'vip.kit.bronze': 'Kit bronze',
     'vip.kit.silver': 'Kit prata',
@@ -163,6 +174,7 @@
     if (value === 'pending' || value === 'pendente') return 'Pendente';
     if (value === 'approved' || value === 'aprovado') return 'Aprovada';
     if (value === 'rejected' || value === 'recusado') return 'Recusada';
+    if (value === 'cancelled' || value === 'arquivado') return 'Arquivada';
     if (value === 'warn') return 'Aviso';
     if (value === 'error') return 'Erro';
     return value ? titleCase(value.replace(/[._-]+/g, ' ')) : '-';

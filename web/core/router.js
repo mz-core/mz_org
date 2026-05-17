@@ -393,6 +393,15 @@
     var key = current.activePanel + ':' + (code || 'self');
     if (current.recruitment.loading || (current.recruitment.loaded && current.recruitment.loadedKey === key)) return;
 
+    if (!code) {
+      current.recruitment.data = [];
+      current.recruitment.error = null;
+      current.recruitment.loaded = true;
+      current.recruitment.loadedKey = key;
+      render();
+      return;
+    }
+
     current.recruitment.loading = true;
     current.recruitment.error = null;
     current.recruitment.loadedKey = key;
@@ -401,7 +410,7 @@
     var filters = { limit: 50 };
     if (code) filters.orgCode = code;
 
-    window.MZOrgRecruitmentService.listRecruitment(filters).then(function (items) {
+    window.MZOrgRecruitmentService.listRecruitment(code, filters).then(function (items) {
       current.recruitment.data = Array.isArray(items) ? items : [];
       current.recruitment.loaded = true;
     }).catch(function (err) {
@@ -410,6 +419,14 @@
       current.recruitment.loading = false;
       render();
     });
+  }
+
+  function reloadRecruitment() {
+    var current = state();
+    current.recruitment.loaded = false;
+    current.recruitment.loadedKey = '';
+    current.recruitment.data = [];
+    return loadRecruitment();
   }
 
   function loadGoals() {
@@ -476,6 +493,8 @@
       renderSidebar() +
       '<main class="main">' + renderHeader() + '<div class="content">' + renderActivePage() + '</div></main>' +
       renderBankModal() +
+      renderGoalModal() +
+      renderMemberModal() +
     '</section>';
   }
 
@@ -766,20 +785,19 @@
         ? ui().errorBox(current.goals.error)
         : renderGoalList(current.goals.data || [], current.activePanel);
 
-    return '<div class="two-col">' + renderCreateGoalCard(contextOrg) + ui().card(goalPanelTitle(current.activePanel), goalCardDescription(current.activePanel), body) + '</div>';
+    return renderGoalsLayout(contextOrg, body);
   }
 
   function renderRecruitmentSection(contextOrg) {
     var current = state();
     var isIllegal = current.activeShell === 'illegal';
-    var title = isIllegal ? 'Recrutamento da faccao' : 'Recrutamento';
     var body = current.recruitment.loading
       ? ui().loading('Carregando recrutamento')
       : current.recruitment.error
         ? ui().errorBox(current.recruitment.error)
         : renderRecruitmentList(current.recruitment.data || [], isIllegal);
 
-    return ui().card(title, 'Candidaturas e convites da organizacao ativa.', body + ui().technicalDetails('Contexto', [{ label: 'Org', value: contextOrg && contextOrg.code }, { label: 'Tipo', value: contextOrg && contextOrg.type }]));
+    return renderRecruitmentLayout(contextOrg, body);
   }
 
   function renderOrgLogsSection() {
@@ -870,7 +888,7 @@
   function canUseBankAction(action, contextOrg) {
     if (perms().isOwner(state().session)) return true;
     var caps = activeOrgCapabilities(contextOrg);
-    return caps.indexOf('account.manage') !== -1 || caps.indexOf(action) !== -1;
+    return caps.indexOf('account.manage') !== -1 || caps.indexOf('manage.account') !== -1 || caps.indexOf(action) !== -1;
   }
 
   function renderBankActionMessages() {
@@ -1082,16 +1100,31 @@
     var current = state();
     var code = selectedOrgCode();
     var contextOrg = perms().contextOrgsForActiveModule().filter(function (org) { return org.code === code; })[0] || null;
-    var inviteBox = renderInviteMemberBox(contextOrg);
     var actionMessages = renderMemberActionMessages();
-
-    if (current.orgView.membersLoading) return ui().card('Membros', 'Equipe e acoes disponiveis.', ui().loading('Carregando membros'));
-    if (current.orgView.membersError) return ui().card('Membros', 'Equipe e acoes disponiveis.', ui().errorBox(current.orgView.membersError));
     var items = current.orgView.members || [];
-    if (!items.length) return ui().card('Membros', 'Equipe e acoes disponiveis.', inviteBox + actionMessages + ui().empty('Nenhum membro encontrado', 'Quando houver membros visiveis para sua sessao, eles aparecem aqui.'));
-    return ui().card('Membros', 'Equipe, cargos e acoes permitidas.', inviteBox + actionMessages + '<div class="table-scroll members-scroll"><table><thead><tr><th>Nome</th><th>Cargo</th><th>Status</th><th>Entrada</th><th>Ultima atividade</th><th>Acoes</th><th>Avancado</th></tr></thead><tbody>' + items.map(function (member) {
-      return '<tr><td class="cell-strong">' + ui().safeText(member.name || 'Membro') + '<span class="cell-subtitle">CID ' + ui().safeText(fmt().maskCitizenId(member.citizenid)) + '</span></td><td>' + ui().safeText(fmt().formatGradeName(member)) + '</td><td><div class="badge-row">' + (member.isLeader ? ui().badge('Lider', 'owner') : '') + (member.isDuty ? ui().badge('Em servico', 'success') : ui().badge('Fora de servico', 'muted')) + ui().badge(fmt().formatStatusLabel(member.status || 'ativo'), 'info') + '</div></td><td>' + ui().safeText(fmt().formatDate(member.joinedAt)) + '</td><td>' + ui().safeText(fmt().formatDate(member.lastSeen)) + '</td><td>' + renderMemberActionButtons(member, contextOrg) + '</td><td>' + ui().technicalDetails('Detalhes', [{ label: 'CitizenID', value: member.citizenid }, { label: 'Grade code', value: member.gradeCode }, { label: 'Grade', value: member.grade }]) + '</td></tr>';
-    }).join('') + '</tbody></table></div>');
+    var body = '';
+
+    if (current.orgView.membersLoading) {
+      body = ui().loading('Carregando membros');
+    } else if (current.orgView.membersError) {
+      body = ui().errorBox(current.orgView.membersError);
+    } else if (!items.length) {
+      body = ui().empty('Nenhum membro encontrado', 'Quando houver membros visiveis para sua sessao, eles aparecem aqui.');
+    } else {
+      body = '<div class="table-scroll members-scroll"><table class="members-table"><thead><tr><th>Nome</th><th>Cargo</th><th>Status</th><th>Entrada</th><th>Acoes</th></tr></thead><tbody>' + items.map(function (member) {
+        return '<tr><td class="cell-strong">' + ui().safeText(member.name || 'Membro') + '<span class="cell-subtitle">CID ' + ui().safeText(fmt().maskCitizenId(member.citizenid)) + '</span></td><td>' + ui().safeText(fmt().formatGradeName(member)) + '</td><td><div class="badge-row">' + (member.isLeader ? ui().badge('Lider', 'owner') : '') + (member.isDuty ? ui().badge('Em servico', 'success') : ui().badge('Fora de servico', 'muted')) + ui().badge(fmt().formatStatusLabel(member.status || 'ativo'), 'info') + '</div></td><td>' + ui().safeText(fmt().formatDate(member.joinedAt)) + '</td><td>' + renderMemberActionButtons(member, contextOrg) + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+    }
+
+    return '<section class="members-section">' +
+      '<div class="members-top-grid">' +
+        '<article class="member-summary-card"><span>Total membros</span><strong>' + ui().safeText(items.length) + '</strong><small>Membros ativos nesta organizacao.</small></article>' +
+        '<article class="member-summary-card"><span>Seu cargo</span><strong>' + ui().safeText(fmt().formatGradeName(contextOrg || current.orgView.detail || {})) + '</strong><small>Acoes liberadas dependem do cargo.</small></article>' +
+        renderMemberInviteActionCard(contextOrg) +
+      '</div>' +
+      actionMessages +
+      '<article class="card members-list-card"><div class="card-header"><h3>Lista de membros</h3><p>Equipe, cargos e acoes permitidas para a organizacao ativa.</p></div><div class="card-body">' + body + '</div></article>' +
+    '</section>';
   }
 
   function canInviteMembers(contextOrg) {
@@ -1136,30 +1169,55 @@
 
   function renderMemberActionMessages() {
     var current = state();
+    var inviteMessage = current.orgView.inviteMessage ? '<div class="inline-message success">' + ui().safeText(current.orgView.inviteMessage) + '</div>' : '';
+    var inviteError = current.orgView.inviteError ? '<div class="inline-message error-inline">' + ui().safeText(current.orgView.inviteError) + '</div>' : '';
     var message = current.orgView.removeMessage ? '<div class="inline-message success">' + ui().safeText(current.orgView.removeMessage) + '</div>' : '';
     var error = current.orgView.removeError ? '<div class="inline-message error-inline">' + ui().safeText(current.orgView.removeError) + '</div>' : '';
     var gradeMessage = current.orgView.gradeMessage ? '<div class="inline-message success">' + ui().safeText(current.orgView.gradeMessage) + '</div>' : '';
     var gradeError = current.orgView.gradeError ? '<div class="inline-message error-inline">' + ui().safeText(current.orgView.gradeError) + '</div>' : '';
-    return message + error + gradeMessage + gradeError;
+    return inviteMessage + inviteError + message + error + gradeMessage + gradeError;
   }
 
-  function renderInviteMemberBox(contextOrg) {
+  function normalizeCitizenForCompare(value) {
+    return String(value || '').replace(/^\s+|\s+$/g, '').toUpperCase();
+  }
+
+  function currentUserCitizenId() {
     var current = state();
-    var message = current.orgView.inviteMessage ? '<div class="inline-message success">' + ui().safeText(current.orgView.inviteMessage) + '</div>' : '';
-    var error = current.orgView.inviteError ? '<div class="inline-message error-inline">' + ui().safeText(current.orgView.inviteError) + '</div>' : '';
-    var gradeSelect = renderInviteGradeSelect(contextOrg);
+    return current.session && current.session.user ? current.session.user.citizenid : '';
+  }
 
-    if (!canInviteMembers(contextOrg)) {
-      return '<div class="invite-box invite-box-muted">' + ui().badge('Sem permissao', 'warning') + '<span>Seu cargo atual nao pode convidar novos membros.</span></div>';
-    }
+  function isSelfMember(memberOrCitizenId) {
+    var myCitizenId = normalizeCitizenForCompare(currentUserCitizenId());
+    var targetCitizenId = typeof memberOrCitizenId === 'object'
+      ? normalizeCitizenForCompare(memberOrCitizenId && memberOrCitizenId.citizenid)
+      : normalizeCitizenForCompare(memberOrCitizenId);
+    return !!myCitizenId && !!targetCitizenId && myCitizenId === targetCitizenId;
+  }
 
-    return '<div class="invite-box">' +
-      '<div><strong>Convidar membro</strong><span>Informe o ID online e escolha a grade inicial.</span><small>A grade e validada pelo servidor.</small></div>' +
-      '<label><span>ID do player online</span><input data-member-invite-target type="number" min="1" step="1" placeholder="Ex: 12" /></label>' +
-      gradeSelect +
-      '<button class="btn btn-primary" data-action="invite-member" ' + (current.orgView.inviteLoading ? 'disabled' : '') + '>' + (current.orgView.inviteLoading ? 'Convidando...' : 'Convidar membro') + '</button>' +
-      message + error +
-    '</div>';
+  function formatMemberActionError(message, fallback) {
+    var error = String(message || '');
+    if (error.indexOf('self_action') !== -1 || error.indexOf('proprio cargo') !== -1) return 'Voce nao pode alterar seu proprio cargo.';
+    if (error.indexOf('self_remove') !== -1 || error.indexOf('remover a si mesmo') !== -1) return 'Voce nao pode remover a si mesmo.';
+    if (error.indexOf('leader_permission_required') !== -1 || error.indexOf('lideranca') !== -1 || error.indexOf('cargo maximo') !== -1) return 'Voce nao tem permissao para alterar lideranca ou cargo maximo.';
+    if (error.indexOf('target_higher_or_equal') !== -1 || error.indexOf('cargo igual ou superior') !== -1) return 'Voce nao pode alterar membro de cargo igual ou superior.';
+    if (error.indexOf('promotion_above_actor') !== -1) return 'Voce nao pode promover para cargo igual ou superior ao seu.';
+    if (error.indexOf('protected_target') !== -1 || error.indexOf('cargo protegido') !== -1) return 'Este membro possui cargo protegido.';
+    if (error.indexOf('forbidden') !== -1 || error.indexOf('Sem permissao') !== -1) return 'Voce nao tem permissao para esta acao.';
+    if (error.indexOf('not_member') !== -1 || error.indexOf('membership_not_found') !== -1) return 'Membro nao encontrado nesta organizacao.';
+    if (error.indexOf('already_member') !== -1) return 'Esse player ja e membro da organizacao.';
+    if (error.indexOf('target_not_found') !== -1 || error.indexOf('invalid_target') !== -1) return 'Player nao encontrado.';
+    if (error.indexOf('Aguarde') !== -1 || error.indexOf('rate_limited') !== -1) return 'Aguarde alguns segundos e tente novamente.';
+    return error || fallback || 'Nao foi possivel concluir a acao.';
+  }
+
+  function renderMemberInviteActionCard(contextOrg) {
+    var current = state();
+    var allowed = canInviteMembers(contextOrg);
+    return '<button class="member-action-card invite" type="button" data-action="open-member-modal" ' + (!allowed || current.memberModal.loading ? 'disabled' : '') + '>' +
+      '<strong>Convidar</strong>' +
+      '<span>' + ui().safeText(allowed ? 'Adicionar membro por CitizenID.' : 'Seu cargo atual nao pode convidar.') + '</span>' +
+    '</button>';
   }
 
   function inviteGradeOptions(contextOrg) {
@@ -1169,11 +1227,31 @@
 
     if (!grades.length) return [];
     if (current.session && current.session.user && current.session.user.isOwner) return grades;
-    if (perms().isStaffAccess(current.session)) return grades;
+
+    var caps = [];
+    if (contextOrg && Array.isArray(contextOrg.capabilities)) caps = caps.concat(contextOrg.capabilities);
+    if (current.orgView.detail && Array.isArray(current.orgView.detail.capabilities)) caps = caps.concat(current.orgView.detail.capabilities);
+    var globalCaps = current.session && current.session.user && Array.isArray(current.session.user.globalPermissions)
+      ? current.session.user.globalPermissions
+      : [];
+    var canSetLeader = caps.indexOf('members.set_leader') !== -1
+      || globalCaps.indexOf('staff.orgs.set_leader') !== -1;
+    var maxLevel = grades.reduce(function (max, grade) {
+      return Math.max(max, fmt().asNumber(grade.level, 0));
+    }, 0);
+
+    if (perms().isStaffAccess(current.session)) {
+      return canSetLeader ? grades : grades.filter(function (grade) {
+        return fmt().asNumber(grade.level, 0) < maxLevel;
+      });
+    }
 
     var actorLevel = fmt().asNumber(contextOrg && contextOrg.grade, 0);
     return grades.filter(function (grade) {
-      return fmt().asNumber(grade.level, 0) > 0 && fmt().asNumber(grade.level, 0) < actorLevel;
+      var level = fmt().asNumber(grade.level, 0);
+      if (level <= 0 || level >= actorLevel) return false;
+      if (maxLevel > 0 && level >= maxLevel && !canSetLeader) return false;
+      return true;
     });
   }
 
@@ -1184,37 +1262,72 @@
     var helper = loading ? 'Carregando cargos...' : 'Se nada for escolhido, o core usa a menor grade segura.';
 
     if (!grades.length) {
-      return '<label><span>Grade inicial</span><select data-member-invite-grade disabled><option value="">Cargo inicial automatico</option></select><small>' + ui().safeText(helper) + '</small></label>';
+      return '<label><span>Grade inicial</span><select data-member-modal-grade disabled><option value="">Cargo inicial automatico</option></select><small>' + ui().safeText(helper) + '</small></label>';
     }
 
-    return '<label><span>Grade inicial</span><select data-member-invite-grade>' +
+    return '<label><span>Grade inicial</span><select data-member-modal-grade ' + (current.memberModal.loading ? 'disabled' : '') + '>' +
       '<option value="">Cargo inicial automatico</option>' +
       grades.map(function (grade) {
-        return '<option value="' + ui().escapeHtml(grade.level) + '" data-grade-code="' + ui().escapeHtml(grade.code || '') + '">' + ui().safeText(grade.name || grade.code) + ' (nivel ' + ui().safeText(grade.level) + ')</option>';
+        var selected = String(current.memberModal.gradeLevel || '') === String(grade.level || '') ? ' selected' : '';
+        return '<option value="' + ui().escapeHtml(grade.level) + '" data-grade-code="' + ui().escapeHtml(grade.code || '') + '"' + selected + '>' + ui().safeText(grade.name || grade.code) + ' (nivel ' + ui().safeText(grade.level) + ')</option>';
       }).join('') +
       '</select><small>' + ui().safeText(helper) + '</small></label>';
   }
 
-  function inviteMember() {
+  function openMemberInviteModal() {
+    var current = state();
+    current.orgView.inviteMessage = null;
+    current.orgView.inviteError = null;
+    current.memberModal.open = true;
+    current.memberModal.citizenid = '';
+    current.memberModal.gradeLevel = '';
+    current.memberModal.gradeCode = '';
+    current.memberModal.loading = false;
+    current.memberModal.error = null;
+    render();
+  }
+
+  function closeMemberInviteModal() {
+    var current = state();
+    if (current.memberModal.loading) return;
+    current.memberModal.open = false;
+    current.memberModal.error = null;
+    render();
+  }
+
+  function formatMemberInviteError(message) {
+    var error = String(message || '');
+    if (error.indexOf('target_not_found') !== -1 || error.indexOf('Player nao encontrado') !== -1) return 'Player nao encontrado.';
+    if (error.indexOf('already_member') !== -1 || error.indexOf('ja e membro') !== -1) return 'Esse player ja e membro da organizacao.';
+    if (error.indexOf('self_target') !== -1 || error.indexOf('si mesmo') !== -1) return 'Voce nao pode convidar a si mesmo.';
+    if (error.indexOf('leader_permission_required') !== -1 || error.indexOf('lideranca') !== -1 || error.indexOf('cargo maximo') !== -1) return 'Voce nao tem permissao para alterar lideranca ou cargo maximo.';
+    if (error.indexOf('forbidden') !== -1 || error.indexOf('Sem permissao') !== -1) return 'Voce nao tem permissao para convidar.';
+    if (error.indexOf('invalid_grade') !== -1 || error.indexOf('grade_not_allowed') !== -1 || error.indexOf('Cargo inicial') !== -1) return 'Cargo inicial invalido ou nao permitido.';
+    if (error.indexOf('invalid_org') !== -1 || error.indexOf('Organizacao invalida') !== -1) return 'Organizacao invalida.';
+    return error || 'Nao foi possivel convidar o membro.';
+  }
+
+  function submitMemberInviteModal() {
     var current = state();
     var app = document.getElementById('app');
     var code = selectedOrgCode();
-    var input = app && app.querySelector('[data-member-invite-target]');
-    var gradeSelect = app && app.querySelector('[data-member-invite-grade]');
-    var targetId = input ? input.value : '';
+    var citizenInput = app && app.querySelector('[data-member-modal-citizenid]');
+    var gradeSelect = app && app.querySelector('[data-member-modal-grade]');
+    var citizenid = citizenInput ? citizenInput.value.replace(/^\s+|\s+$/g, '') : '';
     var grade = null;
 
     current.orgView.inviteMessage = null;
     current.orgView.inviteError = null;
+    current.memberModal.error = null;
 
     if (!code) {
-      current.orgView.inviteError = 'Organizacao invalida.';
+      current.memberModal.error = 'Organizacao invalida.';
       render();
       return;
     }
 
-    if (!targetId) {
-      current.orgView.inviteError = 'Informe o ID do player online.';
+    if (!citizenid) {
+      current.memberModal.error = 'Informe o CitizenID do player.';
       render();
       return;
     }
@@ -1227,18 +1340,58 @@
       };
     }
 
+    current.memberModal.citizenid = citizenid;
+    current.memberModal.gradeLevel = grade ? grade.gradeLevel : '';
+    current.memberModal.gradeCode = grade ? grade.gradeCode : '';
+    current.memberModal.loading = true;
     current.orgView.inviteLoading = true;
     render();
 
-    window.MZOrgMemberService.inviteMember(code, targetId, grade).then(function (data) {
+    window.MZOrgMemberService.inviteMember(code, citizenid, grade).then(function (data) {
       current.orgView.inviteMessage = 'Membro convidado na grade ' + (data.gradeCode || data.grade || 'inicial') + '.';
+      current.memberModal.open = false;
+      current.memberModal.citizenid = '';
+      current.memberModal.gradeLevel = '';
+      current.memberModal.gradeCode = '';
       return reloadMembers(code);
     }).catch(function (err) {
-      current.orgView.inviteError = err.message || 'Nao foi possivel convidar membro.';
+      current.memberModal.error = formatMemberInviteError(err.message);
     }).finally(function () {
+      current.memberModal.loading = false;
       current.orgView.inviteLoading = false;
       render();
     });
+  }
+
+  function inviteMember() {
+    submitMemberInviteModal();
+  }
+
+  function renderMemberModal() {
+    var current = state();
+    var modal = current.memberModal || {};
+    if (!modal.open) return '';
+
+    var org = getActiveOrg() || current.orgView.detail || {};
+    var subtitle = org.name || selectedOrgCode() || 'Organizacao ativa';
+    var contextOrg = perms().contextOrgsForActiveModule().filter(function (item) { return item.code === selectedOrgCode(); })[0] || null;
+    var error = modal.error ? '<div class="member-modal-error">' + ui().safeText(formatMemberInviteError(modal.error)) + '</div>' : '';
+
+    return '<div class="member-modal-backdrop" role="presentation">' +
+      '<section class="member-modal" role="dialog" aria-modal="true" aria-label="Convidar membro">' +
+        '<div class="member-modal-header"><div><span>Convite</span><h3>Convidar membro</h3><p>' + ui().safeText(subtitle) + '</p></div><button class="modal-close" data-action="close-member-modal" aria-label="Cancelar">x</button></div>' +
+        '<div class="member-modal-body">' +
+          '<label><span>CitizenID</span><input data-member-modal-citizenid maxlength="64" value="' + ui().safeText(modal.citizenid) + '" placeholder="CitizenID ou passaporte" ' + (modal.loading ? 'disabled' : '') + ' /></label>' +
+          renderInviteGradeSelect(contextOrg) +
+          '<small class="soft-note member-modal-note">A grade e validada pelo servidor.</small>' +
+          error +
+        '</div>' +
+        '<div class="member-modal-actions">' +
+          '<button class="btn btn-ghost" data-action="close-member-modal" ' + (modal.loading ? 'disabled' : '') + '>Cancelar</button>' +
+          '<button class="member-confirm-btn invite" data-action="submit-member-modal" ' + (modal.loading ? 'disabled' : '') + '>' + ui().safeText(modal.loading ? 'Convidando...' : 'Confirmar convite') + '</button>' +
+        '</div>' +
+      '</section>' +
+    '</div>';
   }
 
   function renderMemberActionButtons(member, contextOrg) {
@@ -1250,6 +1403,10 @@
     var promoteLoading = current.orgView.gradeLoading && current.orgView.gradeAction === 'promote' && current.orgView.gradeCitizenId === member.citizenid;
     var demoteLoading = current.orgView.gradeLoading && current.orgView.gradeAction === 'demote' && current.orgView.gradeCitizenId === member.citizenid;
     var buttons = [];
+
+    if (isSelfMember(member)) {
+      return '<div class="action-row">' + ui().badge('Voce', 'info') + '</div>';
+    }
 
     if (canChangeMemberGrade(contextOrg, 'promote')) {
       buttons.push('<button class="btn btn-ghost" data-action="promote-member" data-citizenid="' + safeCitizen + '" ' + (promoteLoading ? 'disabled' : '') + '>' + (promoteLoading ? 'Promovendo...' : 'Promover') + '</button>');
@@ -1286,6 +1443,14 @@
       return;
     }
 
+    if (isSelfMember(citizenid)) {
+      current.orgView.removeError = 'Voce nao pode remover a si mesmo.';
+      current.orgView.removeLoading = false;
+      current.orgView.removeCitizenId = null;
+      render();
+      return;
+    }
+
     if (!window.confirm('Remover este membro da organizacao?')) return;
 
     current.orgView.removeLoading = true;
@@ -1296,7 +1461,7 @@
       current.orgView.removeMessage = 'Membro removido da organizacao.';
       return reloadMembers(code);
     }).catch(function (err) {
-      current.orgView.removeError = err.message || 'Nao foi possivel remover membro.';
+      current.orgView.removeError = formatMemberActionError(err.message, 'Nao foi possivel remover membro.');
     }).finally(function () {
       current.orgView.removeLoading = false;
       current.orgView.removeCitizenId = null;
@@ -1324,6 +1489,15 @@
       return;
     }
 
+    if (isSelfMember(citizenid)) {
+      current.orgView.gradeError = 'Voce nao pode alterar seu proprio cargo.';
+      current.orgView.gradeLoading = false;
+      current.orgView.gradeAction = null;
+      current.orgView.gradeCitizenId = null;
+      render();
+      return;
+    }
+
     var confirmMessage = action === 'demote' ? 'Rebaixar este membro?' : 'Promover este membro?';
     if (!window.confirm(confirmMessage)) return;
 
@@ -1342,7 +1516,7 @@
         : 'Membro promovido para ' + (data.newGradeCode || data.newGrade || 'proximo cargo') + '.';
       return reloadMembers(code);
     }).catch(function (err) {
-      current.orgView.gradeError = err.message || 'Nao foi possivel alterar cargo.';
+      current.orgView.gradeError = formatMemberActionError(err.message, 'Nao foi possivel alterar cargo.');
     }).finally(function () {
       current.orgView.gradeLoading = false;
       current.orgView.gradeAction = null;
@@ -1368,14 +1542,100 @@
 
   function renderStaffPage() {
     if (!perms().canViewModule(state().session, 'staff')) return '<div class="screen">' + ui().errorBox('Sem permissao para visualizar staff.') + '</div>';
+    var leaderCard = canShowStaffLeaderCard()
+      ? renderStaffLeaderCard()
+      : ui().card('Definir lider', 'Acao administrativa restrita.', '<div class="badge-row">' + ui().badge('Bloqueado', 'warning') + '</div><p class="soft-note">Requer staff.orgs.set_leader ou owner.</p>', 'staff-leader-card');
+
     return '<div class="screen">' +
       '<div class="page-heading"><div><span class="module-kicker">Staff</span><h2>Area administrativa</h2><p>Visao organizada para auditoria e consulta. Acoes criticas continuam bloqueadas no servidor.</p></div>' + ui().badge(perms().getAccessLabel(), perms().getAccessVariant()) + '</div>' +
       '<div class="metric-grid">' + ui().metricCard('assets/icons/staff.svg', 'Liberado', 'Acesso staff/owner', 'S') + ui().metricCard('assets/icons/logs.svg', perms().canViewModule(state().session, 'logs') ? 'Disponivel' : 'Oculto', 'Auditoria') + ui().metricCard('assets/icons/lock.svg', 'Protegidas', 'Acoes sensiveis', 'B') + '</div>' +
       '<div class="two-col">' +
         ui().card('Visao administrativa', 'Atalhos seguros para consulta.', '<div class="module-card-grid"><button class="module-card" data-module="orgs">' + ui().renderIcon('assets/icons/orgs.svg', 'O', 'inline-icon-box') + '<span><strong>Organizacoes</strong><small>Consultar orgs visiveis</small></span></button><button class="module-card" data-module="logs">' + ui().renderIcon('assets/icons/logs.svg', 'L', 'inline-icon-box') + '<span><strong>Logs</strong><small>Acompanhar auditoria</small></span></button></div>') +
-        ui().card('Avisos', 'Sem novas acoes nesta etapa.', '<div class="badge-row">' + ui().badge('Consulta', 'info') + ui().badge('Auditoria', 'success') + ui().badge('Edicao bloqueada', 'warning') + '</div>' + ui().technicalDetails('Detalhes tecnicos', [{ label: 'Modulo', value: 'staff' }, { label: 'Acoes novas', value: 'nenhuma' }])) +
+        leaderCard +
       '</div>' +
     '</div>';
+  }
+
+  function canShowStaffLeaderCard() {
+    var current = state();
+    if (!current.session) return false;
+    if (current.session.user && current.session.user.isOwner) return true;
+    return perms().hasGlobalPermission(current.session, 'staff.orgs.set_leader');
+  }
+
+  function renderStaffLeaderCard() {
+    var current = state();
+    var form = current.staffLeader || {};
+    var message = form.message ? '<div class="inline-message success">' + ui().safeText(form.message) + '</div>' : '';
+    var error = form.error ? '<div class="inline-message error-inline">' + ui().safeText(formatStaffLeaderError(form.error)) + '</div>' : '';
+
+    return ui().card('Definir lider de organizacao', 'Acao minima para testes e administracao.', '<div class="staff-leader-form">' +
+      '<label><span>Codigo da org/gang</span><input data-staff-leader-field="orgCode" maxlength="64" value="' + ui().safeText(form.orgCode) + '" placeholder="Ex: mafia" ' + (form.loading ? 'disabled' : '') + ' /></label>' +
+      '<label><span>CitizenID</span><input data-staff-leader-field="citizenid" maxlength="64" value="' + ui().safeText(form.citizenid) + '" placeholder="CitizenID ou passaporte" ' + (form.loading ? 'disabled' : '') + ' /></label>' +
+      '<label class="staff-leader-wide"><span>Motivo opcional</span><textarea data-staff-leader-field="reason" maxlength="255" rows="3" placeholder="Motivo para auditoria" ' + (form.loading ? 'disabled' : '') + '>' + ui().safeText(form.reason) + '</textarea></label>' +
+      '<p class="soft-note staff-leader-wide">Esta acao coloca o player na maior grade da organizacao selecionada. Requer staff.orgs.set_leader ou owner.</p>' +
+      '<div class="staff-leader-actions"><button class="btn btn-primary" data-action="staff-set-leader" ' + (form.loading ? 'disabled' : '') + '>' + ui().safeText(form.loading ? 'Definindo...' : 'Definir lider') + '</button></div>' +
+      message + error +
+    '</div>', 'staff-leader-card');
+  }
+
+  function formatStaffLeaderError(error) {
+    var key = String(error || '').toLowerCase();
+    if (key.indexOf('invalid_org') !== -1 || key.indexOf('organizacao invalida') !== -1) return 'Organizacao invalida.';
+    if (key.indexOf('invalid_target') !== -1 || key.indexOf('citizenid') !== -1) return 'Informe um CitizenID valido.';
+    if (key.indexOf('target_not_found') !== -1 || key.indexOf('player nao encontrado') !== -1) return 'Player nao encontrado.';
+    if (key.indexOf('forbidden') !== -1 || key.indexOf('permiss') !== -1) return 'Voce nao tem permissao para definir lideranca.';
+    if (key.indexOf('top_grade_not_found') !== -1 || key.indexOf('cargo maximo') !== -1) return 'Cargo maximo da organizacao nao encontrado.';
+    if (key.indexOf('rate_limited') !== -1 || key.indexOf('aguarde') !== -1) return 'Aguarde alguns segundos e tente novamente.';
+    return error || 'Nao foi possivel definir o lider.';
+  }
+
+  function submitStaffLeader() {
+    var current = state();
+    var form = current.staffLeader;
+    var app = document.getElementById('app');
+
+    function field(name) {
+      var input = app && app.querySelector('[data-staff-leader-field="' + name + '"]');
+      return input ? input.value.replace(/^\s+|\s+$/g, '') : (form[name] || '');
+    }
+
+    var orgCode = field('orgCode');
+    var citizenid = field('citizenid');
+    var reason = field('reason');
+
+    form.orgCode = orgCode;
+    form.citizenid = citizenid;
+    form.reason = reason;
+    form.message = null;
+    form.error = null;
+
+    if (!orgCode) {
+      form.error = 'Organizacao invalida.';
+      render();
+      return;
+    }
+
+    if (!citizenid) {
+      form.error = 'Informe um CitizenID valido.';
+      render();
+      return;
+    }
+
+    form.loading = true;
+    render();
+
+    window.MZOrgMemberService.setOrgLeader(orgCode, citizenid, reason).then(function (data) {
+      form.message = 'Lider definido em ' + (data.orgName || data.orgCode || orgCode) + ' na grade ' + (data.gradeName || data.gradeCode || data.gradeLevel || 'maxima') + '.';
+      form.orgCode = '';
+      form.citizenid = '';
+      form.reason = '';
+    }).catch(function (err) {
+      form.error = formatStaffLeaderError(err.message);
+    }).finally(function () {
+      form.loading = false;
+      render();
+    });
   }
 
   function renderLogsPage() {
@@ -1392,6 +1652,249 @@
       ui().card('Filtros locais', 'Refinam somente a lista ja permitida pelo servidor.', renderLogFilters(categoryOptions, severityOptions, orgOptions)) +
       ui().card('Eventos', 'Nenhum dado sensivel bruto e exibido nesta tabela.', listBody) +
     '</div>';
+  }
+
+  function canManageRecruitment(contextOrg) {
+    var current = state();
+    if (!current.session) return false;
+    if (current.session.user && current.session.user.isOwner) return true;
+
+    var caps = [];
+    if (contextOrg && Array.isArray(contextOrg.capabilities)) caps = caps.concat(contextOrg.capabilities);
+    if (current.orgView.detail && Array.isArray(current.orgView.detail.capabilities)) caps = caps.concat(current.orgView.detail.capabilities);
+
+    return caps.indexOf('recruitment.manage') !== -1
+      || caps.indexOf('members.invite') !== -1
+      || caps.indexOf('manage.members') !== -1;
+  }
+
+  function recruitmentSummary(items) {
+    items = Array.isArray(items) ? items : [];
+    return {
+      pending: items.filter(function (item) { return String(item.status || 'pending').toLowerCase() === 'pending'; }).length,
+      approved: items.filter(function (item) { return String(item.status || '').toLowerCase() === 'approved'; }).length,
+      rejected: items.filter(function (item) { return String(item.status || '').toLowerCase() === 'rejected'; }).length
+    };
+  }
+
+  function renderRecruitmentSummaryCard(label, value, description) {
+    return '<article class="recruitment-summary-card"><span>' + ui().safeText(label) + '</span><strong>' + ui().safeText(value) + '</strong><small>' + ui().safeText(description) + '</small></article>';
+  }
+
+  function renderRecruitmentActionCard(contextOrg) {
+    var current = state();
+    var allowed = canManageRecruitment(contextOrg);
+    var text = allowed ? 'Registrar candidato por CitizenID.' : 'Seu cargo atual nao gerencia candidaturas.';
+    return '<button class="recruitment-action-card" data-action="open-recruitment-modal" data-recruitment-mode="create" ' + (!allowed || current.recruitmentModal.loading ? 'disabled' : '') + '><strong>Novo candidato</strong><span>' + ui().safeText(text) + '</span></button>';
+  }
+
+  function renderRecruitmentMessages() {
+    var current = state();
+    var message = current.recruitment.actionMessage ? '<div class="inline-message success">' + ui().safeText(current.recruitment.actionMessage) + '</div>' : '';
+    var error = current.recruitment.actionError ? '<div class="inline-message error-inline">' + ui().safeText(formatRecruitmentError(current.recruitment.actionError)) + '</div>' : '';
+    return message + error;
+  }
+
+  function renderRecruitmentLayout(contextOrg, listBody) {
+    var current = state();
+    var summary = recruitmentSummary(current.recruitment.data || []);
+    var title = current.activeShell === 'illegal' || current.activePanel === 'illegal' ? 'Candidaturas da faccao' : 'Candidaturas';
+
+    return '<section class="recruitment-section">' +
+      '<div class="recruitment-top-grid">' +
+        renderRecruitmentSummaryCard('Pendentes', summary.pending, 'Aguardando decisao nesta org.') +
+        renderRecruitmentSummaryCard('Aprovados', summary.approved, 'Viraram membros reais.') +
+        renderRecruitmentActionCard(contextOrg) +
+      '</div>' +
+      renderRecruitmentMessages() +
+      ui().card(title, 'Candidatos filtrados pela organizacao ativa.', listBody, 'recruitment-list-card') +
+      renderRecruitmentModal() +
+    '</section>';
+  }
+
+  function renderRecruitmentActionButtons(item) {
+    if (!item || !item.id) return ui().safeText('-');
+    var status = String(item.status || 'pending').toLowerCase();
+    if (status !== 'pending') {
+      if (status === 'approved') return ui().badge('Aprovada', 'success');
+      if (status === 'rejected') return ui().badge('Recusada', 'danger');
+      if (status === 'cancelled') return ui().badge('Arquivada', 'muted');
+      return ui().badge(fmt().formatStatusLabel(status), recruitmentStatusVariant(status));
+    }
+
+    var id = ui().escapeHtml(item.id);
+    return '<div class="action-row">' +
+      '<button class="btn btn-ghost" data-action="open-recruitment-modal" data-recruitment-mode="approve" data-recruitment-id="' + id + '">Aprovar</button>' +
+      '<button class="btn btn-ghost danger-btn" data-action="open-recruitment-modal" data-recruitment-mode="reject" data-recruitment-id="' + id + '">Recusar</button>' +
+      '<button class="btn btn-ghost" data-action="open-recruitment-modal" data-recruitment-mode="cancel" data-recruitment-id="' + id + '">Arquivar</button>' +
+    '</div>';
+  }
+
+  function recruitmentById(id) {
+    id = String(id || '');
+    return (state().recruitment.data || []).filter(function (item) {
+      return String(item.id || '') === id;
+    })[0] || null;
+  }
+
+  function openRecruitmentModal(mode, id) {
+    var current = state();
+    var item = recruitmentById(id);
+    current.recruitment.actionMessage = null;
+    current.recruitment.actionError = null;
+    current.recruitmentModal.open = true;
+    current.recruitmentModal.mode = mode || 'create';
+    current.recruitmentModal.id = id || null;
+    current.recruitmentModal.citizenid = '';
+    current.recruitmentModal.gradeLevel = item && item.desiredGradeLevel ? String(item.desiredGradeLevel) : '';
+    current.recruitmentModal.note = '';
+    current.recruitmentModal.loading = false;
+    current.recruitmentModal.error = null;
+    render();
+  }
+
+  function closeRecruitmentModal() {
+    var current = state();
+    if (current.recruitmentModal.loading) return;
+    current.recruitmentModal.open = false;
+    current.recruitmentModal.error = null;
+    render();
+  }
+
+  function recruitmentGradeSelect(contextOrg, value) {
+    var grades = inviteGradeOptions(contextOrg);
+    var selectedValue = String(value || '');
+    if (!grades.length) {
+      return '<label><span>Grade inicial</span><select data-recruitment-modal-field="gradeLevel" disabled><option value="">Cargo inicial automatico</option></select></label>';
+    }
+
+    return '<label><span>Grade inicial</span><select data-recruitment-modal-field="gradeLevel">' +
+      '<option value="">Cargo inicial automatico</option>' +
+      grades.map(function (grade) {
+        var selected = selectedValue === String(grade.level || '') ? ' selected' : '';
+        return '<option value="' + ui().escapeHtml(grade.level) + '"' + selected + '>' + ui().safeText(grade.name || grade.code) + ' (nivel ' + ui().safeText(grade.level) + ')</option>';
+      }).join('') +
+    '</select></label>';
+  }
+
+  function renderRecruitmentModal() {
+    var current = state();
+    var modal = current.recruitmentModal || {};
+    if (!modal.open) return '';
+
+    var mode = modal.mode || 'create';
+    var item = recruitmentById(modal.id);
+    var org = getActiveOrg() || current.orgView.detail || {};
+    var contextOrg = perms().contextOrgsForActiveModule().filter(function (candidate) { return candidate.code === selectedOrgCode(); })[0] || null;
+    var title = mode === 'approve' ? 'Aprovar candidatura' : mode === 'reject' ? 'Recusar candidatura' : mode === 'cancel' ? 'Arquivar candidatura' : 'Novo candidato';
+    var confirmLabel = mode === 'approve' ? 'Confirmar aprovacao' : mode === 'reject' ? 'Confirmar recusa' : mode === 'cancel' ? 'Arquivar' : 'Criar candidatura';
+    var body = '';
+
+    if (mode === 'create') {
+      body =
+        '<label><span>CitizenID</span><input data-recruitment-modal-field="citizenid" maxlength="64" value="' + ui().safeText(modal.citizenid) + '" placeholder="CitizenID ou passaporte" ' + (modal.loading ? 'disabled' : '') + ' /></label>' +
+        recruitmentGradeSelect(contextOrg, modal.gradeLevel) +
+        '<label class="recruitment-modal-wide"><span>Observacao</span><textarea data-recruitment-modal-field="note" maxlength="1000" rows="3" placeholder="Resumo da triagem" ' + (modal.loading ? 'disabled' : '') + '>' + ui().safeText(modal.note) + '</textarea></label>';
+    } else {
+      body =
+        '<div class="recruitment-decision-summary"><strong>' + ui().safeText(item && (item.candidateName || item.targetName) || 'Candidato') + '</strong><span>CID ' + ui().safeText(fmt().maskCitizenId(item && (item.candidateCitizenId || item.targetCitizenId))) + '</span></div>' +
+        (mode === 'approve' ? recruitmentGradeSelect(contextOrg, modal.gradeLevel) : '') +
+        '<label class="recruitment-modal-wide"><span>' + ui().safeText(mode === 'approve' ? 'Nota opcional' : 'Motivo opcional') + '</span><textarea data-recruitment-modal-field="note" maxlength="1000" rows="3" ' + (modal.loading ? 'disabled' : '') + '>' + ui().safeText(modal.note) + '</textarea></label>';
+    }
+
+    var error = modal.error ? '<div class="recruitment-modal-error">' + ui().safeText(formatRecruitmentError(modal.error)) + '</div>' : '';
+    return '<div class="recruitment-modal-backdrop" role="presentation">' +
+      '<section class="recruitment-modal" role="dialog" aria-modal="true" aria-label="' + ui().safeText(title) + '">' +
+        '<div class="recruitment-modal-header"><div><span>Recrutamento</span><h3>' + ui().safeText(title) + '</h3><p>' + ui().safeText(org.name || selectedOrgCode() || 'Organizacao ativa') + '</p></div><button class="modal-close" data-action="close-recruitment-modal" aria-label="Cancelar">x</button></div>' +
+        '<div class="recruitment-modal-body">' + body + '<small class="soft-note recruitment-modal-note">CitizenID, cargo e permissao sao validados pelo servidor.</small>' + error + '</div>' +
+        '<div class="recruitment-modal-actions">' +
+          '<button class="btn btn-ghost" data-action="close-recruitment-modal" ' + (modal.loading ? 'disabled' : '') + '>Cancelar</button>' +
+          '<button class="recruitment-confirm-btn" data-action="submit-recruitment-modal" ' + (modal.loading ? 'disabled' : '') + '>' + ui().safeText(modal.loading ? 'Processando...' : confirmLabel) + '</button>' +
+        '</div>' +
+      '</section>' +
+    '</div>';
+  }
+
+  function formatRecruitmentError(error) {
+    var key = String(error || '').toLowerCase();
+    if (key.indexOf('player nao encontrado') !== -1 || key.indexOf('target_not_found') !== -1) return 'Player nao encontrado.';
+    if (key.indexOf('ja existe') !== -1 || key.indexOf('already_pending') !== -1) return 'Ja existe uma candidatura pendente para esse CitizenID.';
+    if (key.indexOf('ja e membro') !== -1 || key.indexOf('already_member') !== -1) return 'Esse player ja e membro da organizacao.';
+    if (key.indexOf('sem permissao') !== -1 || key.indexOf('forbidden') !== -1) return 'Voce nao tem permissao para gerenciar recrutamento.';
+    if (key.indexOf('cargo') !== -1 || key.indexOf('grade') !== -1 || key.indexOf('lideranca') !== -1) return 'Cargo inicial invalido ou protegido.';
+    if (key.indexOf('pendente') !== -1 || key.indexOf('invalid_status') !== -1) return 'Esta candidatura nao esta pendente.';
+    if (key.indexOf('aguarde') !== -1 || key.indexOf('rate_limited') !== -1) return 'Aguarde alguns segundos e tente novamente.';
+    return error || 'Nao foi possivel concluir a acao.';
+  }
+
+  function submitRecruitmentModal() {
+    var current = state();
+    var modal = current.recruitmentModal || {};
+    var app = document.getElementById('app');
+    var code = selectedOrgCode();
+    var mode = modal.mode || 'create';
+
+    function field(name) {
+      var input = app && app.querySelector('[data-recruitment-modal-field="' + name + '"]');
+      return input ? input.value : (modal[name] || '');
+    }
+
+    current.recruitment.actionMessage = null;
+    current.recruitment.actionError = null;
+    modal.error = null;
+
+    if (!code) {
+      modal.error = 'Organizacao invalida.';
+      render();
+      return;
+    }
+
+    var note = field('note');
+    var gradeLevel = field('gradeLevel');
+    modal.note = note || '';
+    modal.gradeLevel = gradeLevel || '';
+    modal.loading = true;
+    current.recruitment.actionLoading = true;
+    render();
+
+    var promise;
+    if (mode === 'create') {
+      var citizenid = field('citizenid').replace(/^\s+|\s+$/g, '');
+      modal.citizenid = citizenid;
+      if (!citizenid) {
+        modal.loading = false;
+        current.recruitment.actionLoading = false;
+        modal.error = 'Informe o CitizenID do candidato.';
+        render();
+        return;
+      }
+      promise = window.MZOrgRecruitmentService.createRecruitment(code, { citizenid: citizenid, desiredGradeLevel: gradeLevel, note: note });
+    } else if (mode === 'approve') {
+      promise = window.MZOrgRecruitmentService.approveRecruitment(modal.id, { gradeLevel: gradeLevel, note: note });
+    } else if (mode === 'reject') {
+      promise = window.MZOrgRecruitmentService.rejectRecruitment(modal.id, note);
+    } else {
+      promise = window.MZOrgRecruitmentService.cancelRecruitment(modal.id, note);
+    }
+
+    promise.then(function () {
+      current.recruitment.actionMessage = mode === 'create'
+        ? 'Candidatura criada.'
+        : mode === 'approve'
+          ? 'Candidatura aprovada e membro adicionado.'
+          : mode === 'reject'
+            ? 'Candidatura recusada.'
+            : 'Candidatura arquivada.';
+      modal.open = false;
+      modal.error = null;
+      return reloadRecruitment();
+    }).catch(function (err) {
+      modal.error = formatRecruitmentError(err.message);
+    }).finally(function () {
+      modal.loading = false;
+      current.recruitment.actionLoading = false;
+      render();
+    });
   }
 
   function renderRecruitmentPage() {
@@ -1421,21 +1924,20 @@
     return '<div class="screen">' +
       '<div class="page-heading"><div><span class="module-kicker">' + ui().safeText(panel.title || 'Painel') + '</span><h2>' + ui().safeText(title) + '</h2><p>' + ui().safeText(hint) + '</p></div>' + ui().badge('Triagem', 'info') + '</div>' +
       (available.length > 1 ? renderOrgSelector(available, code) : '') +
-      '<div class="two-col">' +
-        ui().card('Contexto', 'Escopo do recrutamento.', '<div class="detail-grid"><span>Organizacao</span><strong>' + ui().safeText(contextOrg && contextOrg.name || (emptyHub ? 'Candidaturas' : code)) + '</strong><span>Tipo</span><strong>' + ui().safeText(fmt().formatOrgType(contextOrg && contextOrg.type)) + '</strong><span>Modo</span><strong>' + ui().safeText(isIllegal ? 'Privado' : 'Gestao') + '</strong></div>' + ui().technicalDetails('Detalhes tecnicos', [{ label: 'Codigo da org', value: code }, { label: 'Tipo interno', value: contextOrg && contextOrg.type }])) +
-        ui().card('Resumo', 'Triagem sem acoes novas.', '<div class="stat-grid compact">' + ui().statCard('Registros', (current.recruitment.data || []).length, 'Retornados pelo servidor') + ui().statCard('Status', 'Consulta', 'Sem aprovar/recusar nesta tela') + '</div>') +
-      '</div>' +
-      ui().card(title, isIllegal ? 'Lista discreta e privada, filtrada pelo servidor.' : 'Candidaturas e convites da organizacao.', body) +
+      (emptyHub ? ui().empty('Nenhuma organizacao ativa', 'Abra /org ou /gang para operar o recrutamento contextual.') : renderRecruitmentLayout(contextOrg, body)) +
     '</div>';
   }
 
   function renderRecruitmentList(items, isIllegal) {
     if (!items.length) {
-      return ui().empty('Nenhum registro de recrutamento', isIllegal ? 'Nenhuma candidatura ou convite privado foi retornado.' : 'Sem candidaturas ou convites no momento.');
+      return ui().empty('Nenhuma candidatura', isIllegal ? 'Nenhum candidato foi registrado para esta faccao.' : 'Sem candidatos registrados para esta organizacao.');
     }
 
-    return '<div class="table-scroll"><table><thead><tr><th>Data</th><th>Status</th><th>Tipo</th><th>Candidato</th><th>Mensagem</th><th>Avancado</th></tr></thead><tbody>' + items.map(function (item) {
-      return '<tr><td>' + ui().safeText(fmt().formatDate(item.createdAt)) + '</td><td>' + ui().badge(fmt().formatStatusLabel(item.status || 'pendente'), recruitmentStatusVariant(item.status)) + '</td><td>' + ui().safeText(fmt().formatStatusLabel(item.type || 'candidatura')) + '</td><td class="cell-strong">' + ui().safeText(item.candidateName || 'Candidato') + '<span class="cell-subtitle">CID ' + ui().safeText(fmt().maskCitizenId(item.candidateCitizenId)) + '</span></td><td>' + ui().safeText(item.message) + '</td><td>' + ui().technicalDetails('Detalhes', [{ label: 'CitizenID', value: item.candidateCitizenId }, { label: 'Org', value: item.orgCode }]) + '</td></tr>';
+    return '<div class="recruitment-scroll"><table class="recruitment-table"><thead><tr><th>Candidato</th><th>CitizenID</th><th>Status</th><th>Cargo</th><th>Data</th><th>Acoes</th></tr></thead><tbody>' + items.map(function (item) {
+      var status = String(item.status || 'pending').toLowerCase();
+      var grade = item.desiredGradeLevel ? ('Nivel ' + item.desiredGradeLevel) : 'Inicial segura';
+      if (item.desiredGradeCode) grade += ' - ' + item.desiredGradeCode;
+      return '<tr><td class="cell-strong">' + ui().safeText(item.candidateName || item.targetName || 'Candidato') + (item.note ? '<span class="cell-subtitle">' + ui().safeText(item.note) + '</span>' : '') + '</td><td>' + ui().safeText(fmt().maskCitizenId(item.candidateCitizenId || item.targetCitizenId)) + '</td><td>' + ui().badge(fmt().formatStatusLabel(status), recruitmentStatusVariant(status)) + '</td><td>' + ui().safeText(grade) + '</td><td>' + ui().safeText(fmt().formatDate(item.createdAt)) + '</td><td>' + renderRecruitmentActionButtons(item) + '</td></tr>';
     }).join('') + '</tbody></table></div>';
   }
 
@@ -1461,11 +1963,7 @@
     return '<div class="screen">' +
       '<div class="page-heading"><div><span class="module-kicker">' + ui().safeText(panel.title || 'Painel') + '</span><h2>' + ui().safeText(title) + '</h2><p>Metas ativas, progresso e criacao quando seu cargo permitir.</p></div>' + ui().badge((current.goals.data || []).length + ' metas', 'info') + '</div>' +
       (available.length > 1 ? renderOrgSelector(available, code) : '') +
-      '<div class="two-col">' +
-        ui().card('Contexto', isIllegal ? 'Metas privadas da faccao.' : 'Escopo das metas da organizacao.', '<div class="detail-grid"><span>Organizacao</span><strong>' + ui().safeText(contextOrg && contextOrg.name || code) + '</strong><span>Tipo</span><strong>' + ui().safeText(fmt().formatOrgType(contextOrg && contextOrg.type)) + '</strong><span>Retornadas</span><strong>' + ui().safeText((current.goals.data || []).length) + '</strong></div>' + ui().technicalDetails('Detalhes tecnicos', [{ label: 'Codigo da org', value: code }, { label: 'Tipo interno', value: contextOrg && contextOrg.type }])) +
-        renderCreateGoalCard(contextOrg) +
-      '</div>' +
-      ui().card(title, goalCardDescription(current.activePanel), body) +
+      renderGoalsLayout(contextOrg, body) +
     '</div>';
   }
 
@@ -1502,21 +2000,116 @@
     '</div></details>');
   }
 
-  function createGoal() {
+  function goalSummary(items) {
+    items = Array.isArray(items) ? items : [];
+    var active = items.filter(function (goal) {
+      var status = String(goal.status || 'active').toLowerCase();
+      return status === 'active' || status === 'ativa';
+    });
+    var completed = items.filter(function (goal) {
+      var status = String(goal.status || '').toLowerCase();
+      return status === 'completed' || status === 'concluida';
+    });
+    var progressTotal = active.reduce(function (sum, goal) {
+      var percent = fmt().asNumber(goal.progressPercent, 0);
+      if (!percent && goal.target) percent = (fmt().asNumber(goal.progress, 0) / Math.max(fmt().asNumber(goal.target, 1), 1)) * 100;
+      if (percent < 0) percent = 0;
+      if (percent > 100) percent = 100;
+      return sum + percent;
+    }, 0);
+
+    return {
+      active: active.length,
+      completed: completed.length,
+      average: active.length ? Math.round(progressTotal / active.length) : 0
+    };
+  }
+
+  function renderGoalSummaryCard(label, value, description) {
+    return '<article class="goal-summary-card"><span>' + ui().safeText(label) + '</span><strong>' + ui().safeText(value) + '</strong><small>' + ui().safeText(description) + '</small></article>';
+  }
+
+  function renderGoalActionCard(contextOrg) {
+    var current = state();
+    var canCreate = canCreateGoals(contextOrg);
+    var text = canCreate ? 'Defina uma nova meta para a organizacao.' : 'Seu cargo atual nao pode criar metas.';
+    return '<button class="goal-action-card create" data-action="open-goal-modal" ' + (!canCreate || current.goalModal.loading ? 'disabled' : '') + '><strong>Criar meta</strong><span>' + ui().safeText(text) + '</span></button>';
+  }
+
+  function renderGoalsLayout(contextOrg, listBody) {
+    var current = state();
+    var summary = goalSummary(current.goals.data || []);
+    var message = current.goals.createMessage ? '<div class="inline-message success">' + ui().safeText(current.goals.createMessage) + '</div>' : '';
+    var error = current.goals.createError ? '<div class="inline-message error-inline">' + ui().safeText(formatGoalError(current.goals.createError)) + '</div>' : '';
+
+    return '<section class="goals-section">' +
+      '<div class="goals-top-grid">' +
+        renderGoalSummaryCard('Metas ativas', summary.active, 'Metas em andamento nesta organizacao.') +
+        renderGoalSummaryCard('Progresso geral', summary.average + '%', 'Media das metas ativas.') +
+        renderGoalActionCard(contextOrg) +
+      '</div>' +
+      message + error +
+      ui().card(goalPanelTitle(state().activePanel), goalCardDescription(state().activePanel), listBody, 'goals-list-card') +
+    '</section>';
+  }
+
+  function formatGoalError(error) {
+    var raw = String(error || '');
+    var key = raw.toLowerCase();
+    var messages = {
+      invalid_title: 'Informe um titulo para a meta.',
+      invalid_target: 'Informe um objetivo valido.',
+      invalid_dates: 'Verifique as datas da meta.',
+      forbidden: 'Voce nao tem permissao para criar metas.'
+    };
+
+    if (messages[key]) return messages[key];
+    if (key.indexOf('titulo') !== -1 || key.indexOf('title') !== -1) return 'Informe um titulo para a meta.';
+    if (key.indexOf('objetivo') !== -1 || key.indexOf('target') !== -1) return 'Informe um objetivo valido.';
+    if (key.indexOf('data') !== -1 || key.indexOf('date') !== -1) return 'Verifique as datas da meta.';
+    if (key.indexOf('permiss') !== -1 || key === 'forbidden') return 'Voce nao tem permissao para criar metas.';
+    return raw || 'Nao foi possivel criar a meta.';
+  }
+
+  function openGoalModal() {
+    var current = state();
+    current.goalModal.open = true;
+    current.goalModal.title = '';
+    current.goalModal.type = 'manual';
+    current.goalModal.target = 1;
+    current.goalModal.startsAt = '';
+    current.goalModal.endsAt = '';
+    current.goalModal.description = '';
+    current.goalModal.loading = false;
+    current.goalModal.error = null;
+    current.goals.createError = null;
+    render();
+  }
+
+  function closeGoalModal() {
+    var current = state();
+    if (current.goalModal.loading) return;
+    current.goalModal.open = false;
+    current.goalModal.error = null;
+    render();
+  }
+
+  function submitGoalModal() {
     var current = state();
     var app = document.getElementById('app');
     var code = selectedOrgCode();
 
     function field(name) {
-      var input = app && app.querySelector('[data-goal-field="' + name + '"]');
-      return input ? input.value : '';
+      var input = app && app.querySelector('[data-goal-modal-field="' + name + '"]');
+      return input ? input.value : (current.goalModal[name] || '');
     }
 
     current.goals.createMessage = null;
     current.goals.createError = null;
+    current.goalModal.error = null;
 
     if (!code) {
-      current.goals.createError = 'Organizacao invalida.';
+      current.goalModal.error = 'Organizacao invalida.';
       render();
       return;
     }
@@ -1531,26 +2124,85 @@
     };
 
     if (!String(payload.title || '').trim()) {
-      current.goals.createError = 'Informe um titulo para a meta.';
+      current.goalModal.error = 'Informe um titulo para a meta.';
       render();
       return;
     }
 
-    current.goals.createLoading = true;
+    if (fmt().asNumber(payload.target, 0) <= 0) {
+      current.goalModal.error = 'Informe um objetivo valido.';
+      render();
+      return;
+    }
+
+    current.goalModal.title = payload.title;
+    current.goalModal.type = payload.type || 'manual';
+    current.goalModal.target = payload.target || 1;
+    current.goalModal.startsAt = payload.startsAt || '';
+    current.goalModal.endsAt = payload.endsAt || '';
+    current.goalModal.description = payload.description || '';
+    current.goalModal.loading = true;
     render();
 
     window.MZOrgGoalService.createGoal(code, payload).then(function (data) {
       current.goals.createMessage = 'Meta criada: ' + (data.title || payload.title) + '.';
+      current.goalModal.open = false;
+      current.goalModal.title = '';
+      current.goalModal.type = 'manual';
+      current.goalModal.target = 1;
+      current.goalModal.startsAt = '';
+      current.goalModal.endsAt = '';
+      current.goalModal.description = '';
+      current.goalModal.error = null;
       current.goals.loaded = false;
       current.goals.loadedKey = '';
       current.goals.data = [];
       loadGoals();
     }).catch(function (err) {
-      current.goals.createError = err.message || 'Nao foi possivel criar meta.';
+      current.goalModal.error = formatGoalError(err.message);
     }).finally(function () {
-      current.goals.createLoading = false;
+      current.goalModal.loading = false;
       render();
     });
+  }
+
+  function createGoal() {
+    submitGoalModal();
+  }
+
+  function renderGoalModal() {
+    var current = state();
+    var modal = current.goalModal || {};
+    if (!modal.open) return '';
+
+    var org = getActiveOrg() || current.orgView.detail || {};
+    var subtitle = org.name || selectedOrgCode() || 'Organizacao ativa';
+    var error = modal.error ? '<div class="goal-modal-error">' + ui().safeText(formatGoalError(modal.error)) + '</div>' : '';
+
+    return '<div class="goal-modal-backdrop" role="presentation">' +
+      '<section class="goal-modal" role="dialog" aria-modal="true" aria-label="Criar meta">' +
+        '<div class="goal-modal-header"><div><span>Metas</span><h3>Criar meta</h3><p>' + ui().safeText(subtitle) + '</p></div><button class="modal-close" data-action="close-goal-modal" aria-label="Cancelar">x</button></div>' +
+        '<div class="goal-modal-body">' +
+          '<label><span>Titulo</span><input data-goal-modal-field="title" maxlength="120" value="' + ui().safeText(modal.title) + '" placeholder="Ex: Patrulhamento semanal" ' + (modal.loading ? 'disabled' : '') + ' /></label>' +
+          '<label><span>Tipo</span><select data-goal-modal-field="type" ' + (modal.loading ? 'disabled' : '') + '>' +
+            '<option value="manual" ' + (modal.type === 'manual' ? 'selected' : '') + '>Manual</option>' +
+            '<option value="weekly" ' + (modal.type === 'weekly' ? 'selected' : '') + '>Semanal</option>' +
+            '<option value="monthly" ' + (modal.type === 'monthly' ? 'selected' : '') + '>Mensal</option>' +
+            '<option value="collective" ' + (modal.type === 'collective' ? 'selected' : '') + '>Coletiva</option>' +
+            '<option value="individual" ' + (modal.type === 'individual' ? 'selected' : '') + '>Individual</option>' +
+          '</select></label>' +
+          '<label><span>Objetivo</span><input data-goal-modal-field="target" type="number" min="1" max="100000" step="1" value="' + ui().safeText(modal.target || 1) + '" ' + (modal.loading ? 'disabled' : '') + ' /></label>' +
+          '<label><span>Inicio opcional</span><input data-goal-modal-field="startsAt" type="date" value="' + ui().safeText(modal.startsAt) + '" ' + (modal.loading ? 'disabled' : '') + ' /></label>' +
+          '<label><span>Fim opcional</span><input data-goal-modal-field="endsAt" type="date" value="' + ui().safeText(modal.endsAt) + '" ' + (modal.loading ? 'disabled' : '') + ' /></label>' +
+          '<label class="goal-modal-wide"><span>Descricao</span><textarea data-goal-modal-field="description" maxlength="1000" rows="3" placeholder="Detalhe o objetivo sem dados sensiveis." ' + (modal.loading ? 'disabled' : '') + '>' + ui().safeText(modal.description) + '</textarea></label>' +
+          error +
+        '</div>' +
+        '<div class="goal-modal-actions">' +
+          '<button class="btn btn-ghost" data-action="close-goal-modal" ' + (modal.loading ? 'disabled' : '') + '>Cancelar</button>' +
+          '<button class="goal-confirm-btn create" data-action="submit-goal-modal" ' + (modal.loading ? 'disabled' : '') + '>' + ui().safeText(modal.loading ? 'Criando...' : 'Confirmar meta') + '</button>' +
+        '</div>' +
+      '</section>' +
+    '</div>';
   }
 
   function goalPanelTitle(panelId) {
@@ -1572,8 +2224,11 @@
       return ui().empty('Nenhuma meta ativa', panelId === 'business' || panelId === 'government' ? 'Crie uma meta quando o cargo tiver permissao.' : 'Quando houver metas, elas aparecem aqui.');
     }
 
-    return '<div class="table-scroll"><table><thead><tr><th>Meta</th><th>Status</th><th>Tipo</th><th>Progresso</th><th>Periodo</th><th>Criada por</th><th>Avancado</th></tr></thead><tbody>' + items.map(function (goal) {
-      return '<tr><td class="cell-strong">' + ui().safeText(goal.title) + '<span class="cell-subtitle">' + ui().safeText(goal.description) + '</span></td><td>' + ui().badge(fmt().formatStatusLabel(goal.status || 'ativa'), goalStatusVariant(goal.status)) + '</td><td>' + ui().safeText(fmt().formatGoalType(goal.type)) + '</td><td>' + renderGoalProgress(goal) + '</td><td>' + ui().safeText(fmt().formatDate(goal.startsAt)) + ' - ' + ui().safeText(fmt().formatDate(goal.endsAt)) + '</td><td>' + ui().safeText(goal.createdByName || 'Sistema') + '</td><td>' + ui().technicalDetails('Detalhes', [{ label: 'ID', value: goal.id }, { label: 'Org', value: goal.orgCode }, { label: 'Tipo tecnico', value: goal.type }]) + '</td></tr>';
+    return '<div class="goals-scroll"><table class="goals-table"><thead><tr><th>Meta</th><th>Status</th><th>Tipo</th><th>Progresso</th><th>Periodo</th><th>Criada por</th></tr></thead><tbody>' + items.map(function (goal) {
+      var period = goal.startsAt || goal.endsAt
+        ? ui().safeText(fmt().formatDate(goal.startsAt)) + ' - ' + ui().safeText(fmt().formatDate(goal.endsAt))
+        : 'Sem prazo';
+      return '<tr><td class="cell-strong">' + ui().safeText(goal.title) + (goal.description ? '<span class="cell-subtitle">' + ui().safeText(goal.description) + '</span>' : '') + '</td><td>' + ui().badge(fmt().formatStatusLabel(goal.status || 'ativa'), goalStatusVariant(goal.status)) + '</td><td>' + ui().safeText(fmt().formatGoalType(goal.type)) + '</td><td>' + renderGoalProgress(goal) + '</td><td>' + period + '</td><td>' + ui().safeText(goal.createdByName || 'Sistema') + '</td></tr>';
     }).join('') + '</tbody></table></div>';
   }
 
@@ -1718,6 +2373,20 @@
       inviteButton.addEventListener('click', inviteMember);
     }
 
+    var openMemberButton = app.querySelector('[data-action="open-member-modal"]');
+    if (openMemberButton) {
+      openMemberButton.addEventListener('click', openMemberInviteModal);
+    }
+
+    app.querySelectorAll('[data-action="close-member-modal"]').forEach(function (button) {
+      button.addEventListener('click', closeMemberInviteModal);
+    });
+
+    var submitMemberButton = app.querySelector('[data-action="submit-member-modal"]');
+    if (submitMemberButton) {
+      submitMemberButton.addEventListener('click', submitMemberInviteModal);
+    }
+
     app.querySelectorAll('[data-action="remove-member"]').forEach(function (button) {
       button.addEventListener('click', function () {
         removeMember(button.getAttribute('data-citizenid'));
@@ -1741,6 +2410,35 @@
       createGoalButton.addEventListener('click', createGoal);
     }
 
+    var openGoalButton = app.querySelector('[data-action="open-goal-modal"]');
+    if (openGoalButton) {
+      openGoalButton.addEventListener('click', openGoalModal);
+    }
+
+    app.querySelectorAll('[data-action="close-goal-modal"]').forEach(function (button) {
+      button.addEventListener('click', closeGoalModal);
+    });
+
+    var submitGoalButton = app.querySelector('[data-action="submit-goal-modal"]');
+    if (submitGoalButton) {
+      submitGoalButton.addEventListener('click', submitGoalModal);
+    }
+
+    app.querySelectorAll('[data-action="open-recruitment-modal"]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        openRecruitmentModal(button.getAttribute('data-recruitment-mode') || 'create', button.getAttribute('data-recruitment-id'));
+      });
+    });
+
+    app.querySelectorAll('[data-action="close-recruitment-modal"]').forEach(function (button) {
+      button.addEventListener('click', closeRecruitmentModal);
+    });
+
+    var submitRecruitmentButton = app.querySelector('[data-action="submit-recruitment-modal"]');
+    if (submitRecruitmentButton) {
+      submitRecruitmentButton.addEventListener('click', submitRecruitmentModal);
+    }
+
     app.querySelectorAll('[data-action="open-bank-modal"]').forEach(function (button) {
       button.addEventListener('click', function () {
         openBankModal(button.getAttribute('data-bank-type'));
@@ -1754,6 +2452,11 @@
     var submitBankButton = app.querySelector('[data-action="submit-bank-modal"]');
     if (submitBankButton) {
       submitBankButton.addEventListener('click', submitBankModal);
+    }
+
+    var staffSetLeaderButton = app.querySelector('[data-action="staff-set-leader"]');
+    if (staffSetLeaderButton) {
+      staffSetLeaderButton.addEventListener('click', submitStaffLeader);
     }
 
     app.querySelectorAll('[data-log-filter]').forEach(function (input) {
@@ -1786,6 +2489,7 @@
     loadOrgs: loadOrgs,
     loadLogs: loadLogs,
     loadRecruitment: loadRecruitment,
+    reloadRecruitment: reloadRecruitment,
     loadGoals: loadGoals,
     reloadGoals: reloadGoals,
     render: render,
