@@ -198,7 +198,7 @@ Ponto de cuidado:
 
 Protecoes implementadas:
 
-- `/staff` agora tem dashboard seguro/read-only com abas internas de visao geral, organizacoes, logs, auditoria e acoes administrativas bloqueadas.
+- `/staff` agora tem dashboard seguro com abas internas de visao geral, organizacoes, logs, auditoria e acoes administrativas bloqueadas/limitadas.
 - `/staff` possui uma acao minima para definir lider por `orgCode` e `citizenid`, sem CRUD global de orgs.
 - O export seguro `SetOrgLeaderByCitizenId(source, orgCode, targetCitizenId, options)` calcula a maior grade no core.
 - Se o alvo ja for membro ativo, a grade e atualizada para a top grade; se nao for membro ativo, e adicionado na top grade.
@@ -256,10 +256,10 @@ Limites mantidos:
 
 - sem editor livre de cargos/permissoes;
 - sem excluir org;
-- sem editar org existente;
+- sem editor avancado de org existente;
 - sem painel staff global completo.
 
-## Detalhes read-only de org no Staff
+## Detalhes de org no Staff
 
 Estado implementado:
 
@@ -284,6 +284,39 @@ Garantias:
 - payload tecnico bruto nao e exibido;
 - banco e recrutamento no Staff ficam read-only;
 - cards de edicao de org, cargos, permissoes, membros e banco continuam inexistentes/bloqueados.
+
+Atualizacao de lideranca no detalhe:
+
+- `Definir lider` agora fica em `/staff > Organizacoes > Ver detalhes > Acoes`;
+- a tela nao pede `orgCode` manual;
+- o `orgCode` usado vem do detalhe selecionado (`staffOrgDetails.orgCode`);
+- a NUI continua sem enviar `gradeId`, `gradeLevel`, `source`, actor ou permissoes;
+- o callback existente `members:setLeader` e o export seguro do core continuam fazendo a validacao forte.
+
+Atualizacao de dados basicos no detalhe:
+
+- `Editar dados basicos` fica em `/staff > Organizacoes > Ver detalhes > Acoes`;
+- callback NUI: `orgs:updateBasic`;
+- export do core: `UpdateOrgBasicInfo(source, orgCode, payload)`;
+- permissao exigida: owner ACE `group.mz_owner` ou `staff.orgs.manage`;
+- `staff.panel.open`, `staff.orgs.view`, `staff.orgs.create` e `staff.orgs.set_leader` nao autorizam essa escrita;
+- campos permitidos: `name`, `status`, `hasSalary`, `hasSharedAccount`, `hasStorage` e `reason`;
+- campos proibidos: `code`, `type`, cargos, grades, permissoes, membros, banco, metas, recrutamento e logs;
+- o core traduz `status` para as colunas reais `is_public` e `active`, sem criar tabela ou coluna nova;
+- logs gerados: `org.update_basic` e `org.update_basic.blocked`, com before/after basico e motivo.
+
+Gerenciamento basico de cargos no detalhe:
+
+- fica em `/staff > Organizacoes > Ver detalhes > Cargos`;
+- callbacks NUI: `orgs:createGrade` e `orgs:updateGradeBasic`;
+- exports do core: `CreateOrgGrade(source, orgCode, payload)` e `UpdateOrgGradeBasic(source, orgCode, gradeId, payload)`;
+- permissao exigida: owner ACE `group.mz_owner` ou `staff.orgs.manage`;
+- criar ou mover cargo acima da top grade atual tambem exige owner ou `staff.orgs.set_leader`;
+- `code` so e aceito na criacao; update nao altera code;
+- o server valida org real, grade real, conflitos de `code`/`level`, salario, heranca e ciclo;
+- permissoes/capabilities diretas podem ser gerenciadas em modal controlado por allowlist oficial;
+- o schema atual de `mz_org_grades` possui `active`, usado para desativar/reativar cargo sem DELETE fisico;
+- logs gerados: `org.grade.create`, `org.grade.update`, `org.grade.create.blocked` e `org.grade.update.blocked`.
 
 ## Hierarquia staff
 
@@ -483,3 +516,36 @@ Regra revisada: `staff.panel.open` identifica/libera o painel staff, mas nao aut
 ## Conclusao
 
 A base atual esta bem encaminhada: `citizenid` ja e a chave real do core, o convite principal ja usa esse identificador, top grade/lideranca ja exige capability dedicada e a maior parte das operacoes sensiveis ja tem wrappers seguros. As proximas prioridades de seguranca sao completar a hierarquia staff, revisar exports legados de baixo nivel e esconder detalhes tecnicos da UI comum.
+
+## Arquivamento e desativacao segura
+
+Status: implementado para Staff com `staff.orgs.manage` ou owner ACE.
+
+- Organizacao arquivada usa `mz_orgs.active = 0`; reativacao usa `active = 1`.
+- Cargo desativado usa `mz_org_grades.active = 0`; reativacao usa `active = 1`.
+- Nao ha DELETE fisico em orgs, grades, membros, banco, metas, recrutamento ou logs.
+- `/staff` pode consultar orgs e cargos arquivados/desativados com badge visual.
+- `/org` e `/gang` deixam de receber orgs arquivadas no contexto normal do player.
+- Cargos desativados nao entram nas listas normais de grades ativas.
+- Desativar cargo bloqueia cargo com membros ativos e cargo maximo/top grade.
+- Org arquivada fica somente consulta no detalhe Staff; a acao permitida e reativar.
+- Payloads NUI aceitos sao apenas `orgCode`, `gradeId` quando aplicavel e `reason`; `source`, ator, permissao, `delete=true`, `orgId`, cargos ou capabilities livres sao ignorados/nao aceitos.
+- Logs de sucesso: `org.archive`, `org.reactivate`, `org.grade.disable`, `org.grade.reactivate`.
+- Logs de bloqueio usam o mesmo nome com sufixo `.blocked`.
+
+## Permissoes por cargo
+
+Status: implementado no Staff, dentro de `Organizacoes > Ver detalhes > Cargos`.
+
+- A UI nao tem campo livre para capability.
+- A lista visual vem de catalogo oficial agrupado.
+- O server tem allowlist propria e rejeita qualquer permissao fora dela.
+- A NUI envia somente `orgCode`, `gradeId`, `permission` e `reason`.
+- O server valida `source` real, ator carregado, org ativa, grade ativa e grade pertencente a org.
+- Permissoes `staff.*` sao bloqueadas para org comum.
+- Em org tipo `staff`, permissao `staff.*` exige owner nesta fase.
+- `members.set_leader` exige owner ou `staff.orgs.set_leader`.
+- Cargos inativos e orgs arquivadas nao aceitam edicao de permissoes.
+- Remover permissao usa `allow = 0` e nao depende de DELETE fisico.
+- Logs de sucesso: `org.grade.permission.add` e `org.grade.permission.remove`.
+- Logs de bloqueio usam `.blocked` com motivo e contexto.

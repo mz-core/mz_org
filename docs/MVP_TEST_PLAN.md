@@ -179,8 +179,22 @@ Resultado esperado:
 - [ ] Aba `Visao geral` carrega.
 - [ ] Aba `Organizacoes` lista orgs read-only.
 - [ ] Clicar `Ver detalhes` em uma org.
-- [ ] Confirmar abas do detalhe: `Resumo`, `Cargos`, `Membros`, `Banco`, `Metas`, `Recrutamento`, `Logs`.
-- [ ] Confirmar que o detalhe nao mostra botoes de editar/salvar/excluir.
+- [ ] Confirmar abas do detalhe: `Resumo`, `Cargos`, `Membros`, `Banco`, `Metas`, `Recrutamento`, `Logs`, `Acoes`.
+- [ ] Confirmar que o detalhe nao mostra editor de cargos/permissoes, excluir/arquivar ou acoes financeiras.
+- [ ] Com owner ou `staff.orgs.manage`, abrir `Editar dados basicos`.
+- [ ] Alterar nome/status/flags e salvar.
+- [ ] Confirmar que detalhe e lista de organizacoes atualizam.
+- [ ] Testar nome vazio, status invalido por payload forcado e usuario sem `staff.orgs.manage`.
+- [ ] Na aba `Cargos`, criar cargo `sub_lider`.
+- [ ] Tentar criar cargo com code duplicado.
+- [ ] Tentar criar cargo com level duplicado.
+- [ ] Editar nome/salario/level/prioridade/heranca de cargo.
+- [ ] Tentar mover cargo acima da top grade sem `staff.orgs.set_leader`.
+- [ ] Confirmar que permissoes continuam read-only e que nao existe excluir/desativar cargo.
+- [ ] Na aba `Acoes`, confirmar que `Definir lider` nao pede `orgCode`.
+- [ ] Definir lider com CitizenID valido usando a org selecionada.
+- [ ] Testar CitizenID invalido/inexistente.
+- [ ] Testar sem `staff.orgs.set_leader` e confirmar bloqueio visual/server-side.
 - [ ] Clicar `Voltar para organizacoes`.
 - [ ] Com owner ou `staff.orgs.create`, abrir modal `Criar organizacao`.
 - [ ] Criar gang com `type=gang`, `code=mafia_norte`, `name=Mafia Norte`.
@@ -189,21 +203,22 @@ Resultado esperado:
 - [ ] Testar sem `staff.orgs.create` e confirmar bloqueio.
 - [ ] Aba `Logs` lista logs recentes.
 - [ ] Aba `Auditoria` mostra eventos sensiveis recentes ou empty state.
-- [ ] Aba `Acoes administrativas` mostra `Definir lider`.
+- [ ] Aba `Acoes administrativas` orienta a usar `Organizacoes > Ver detalhes > Acoes`.
 - [ ] Cards bloqueados nao disparam callback.
-- [ ] Definir lider com `orgCode` e `citizenid` validos.
-- [ ] Definir lider com `orgCode` invalido.
-- [ ] Definir lider com `citizenid` invalido/inexistente.
-- [ ] Testar sem `staff.orgs.set_leader` e confirmar bloqueio.
+- [ ] Confirmar que nao existe formulario global de definir lider com `orgCode` manual.
 - [ ] Abrir `/org` e `/gang` depois de usar `/staff`.
 
 Resultado esperado:
 
 - Staff nao vira painel global completo;
-- detalhes de org no Staff sao read-only;
-- acoes reais do Staff sao `Criar organizacao` por template e `Definir lider`;
+- detalhes de org no Staff sao read-only exceto dados basicos controlados por `staff.orgs.manage`;
+- acoes reais do Staff sao `Criar organizacao` por template, `Editar dados basicos`, `Gerenciar cargos basicos` e `Definir lider` dentro do detalhe da org;
 - criacao de org nao permite editor livre de cargos/permissoes nem tipo `staff`;
+- edicao basica nao permite alterar code/type/cargos/permissoes;
+- edicao de cargos nao permite alterar permissoes nem code no update;
 - `staff.panel.open` nao concede poder operacional;
+- `staff.orgs.manage` controla editar dados basicos;
+- `staff.orgs.manage` controla criar/editar cargos basicos;
 - `staff.orgs.set_leader` controla o card de lideranca.
 
 ## Permissoes e seguranca
@@ -255,6 +270,54 @@ Resultado esperado:
 - Contexto legal/gang/staff fica isolado.
 - Banco, membros e recrutamento funcionam com dados reais.
 - Metas criam/listam sem prometer progresso real.
-- Staff permanece seguro/read-only, exceto definir lider.
+- Staff permanece seguro, com escritas limitadas a criar org por template, editar dados basicos e definir lider.
 - Detalhes tecnicos brutos ficam fora da UI normal.
 - F8 sem erro durante o fluxo principal.
+## Staff: arquivar org e desativar cargo
+
+Comandos:
+
+```text
+restart mz_core
+restart mz_org
+/staff
+```
+
+Checklist:
+
+- Abrir `Organizacoes > Ver detalhes` em uma org ativa.
+- Em `Acoes`, arquivar a org e confirmar que a lista Staff mostra status inativo/arquivado.
+- Confirmar que membros, banco, metas, recrutamento e logs continuam visiveis em consulta.
+- Confirmar que a org arquivada nao permite criar/editar cargos nem definir lider.
+- Reativar a org em `Acoes`.
+- Em `Cargos`, tentar desativar um cargo com membros: deve bloquear.
+- Em `Cargos`, tentar desativar top grade: deve bloquear.
+- Criar um cargo sem membros, desativar e reativar esse cargo.
+- Confirmar que nao existe DELETE fisico nem editor livre de permissoes.
+- Confirmar F8/console sem erro.
+
+## Staff: permissoes por cargo
+
+Comandos:
+
+```text
+restart mz_core
+restart mz_org
+/staff
+```
+
+Checklist:
+
+- Abrir `Organizacoes > Ver detalhes em Ballas > Cargos`.
+- Clicar `Gerenciar permissoes` em um cargo ativo.
+- Confirmar que nao existe campo livre para digitar capability.
+- Adicionar `members.invite`.
+- Tentar adicionar `members.invite` novamente: deve retornar duplicada.
+- Remover `members.invite`.
+- Tentar remover novamente: deve retornar permissao inexistente.
+- Tentar adicionar `members.set_leader` sem owner/`staff.orgs.set_leader`: deve bloquear.
+- Tentar adicionar `staff.orgs.manage` em gang/job: deve bloquear.
+- Arquivar a org e confirmar que o modal de permissoes nao permite edicao.
+- Desativar um cargo sem membros e confirmar que nao permite editar permissoes desse cargo.
+- Confirmar logs `org.grade.permission.add` e `org.grade.permission.remove`.
+- Confirmar F8/console sem erro.

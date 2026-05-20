@@ -124,6 +124,42 @@ RegisterNUICallback('orgs:createFromTemplate', function(data, cb)
   sendServerRequest('mz_org:server:createOrgFromTemplate', data, cb)
 end)
 
+RegisterNUICallback('orgs:updateBasic', function(data, cb)
+  sendServerRequest('mz_org:server:updateOrgBasic', data, cb)
+end)
+
+RegisterNUICallback('orgs:createGrade', function(data, cb)
+  sendServerRequest('mz_org:server:createGrade', data, cb)
+end)
+
+RegisterNUICallback('orgs:updateGradeBasic', function(data, cb)
+  sendServerRequest('mz_org:server:updateGradeBasic', data, cb)
+end)
+
+RegisterNUICallback('orgs:archive', function(data, cb)
+  sendServerRequest('mz_org:server:archiveOrg', data, cb)
+end)
+
+RegisterNUICallback('orgs:reactivate', function(data, cb)
+  sendServerRequest('mz_org:server:reactivateOrg', data, cb)
+end)
+
+RegisterNUICallback('orgs:disableGrade', function(data, cb)
+  sendServerRequest('mz_org:server:disableGrade', data, cb)
+end)
+
+RegisterNUICallback('orgs:reactivateGrade', function(data, cb)
+  sendServerRequest('mz_org:server:reactivateGrade', data, cb)
+end)
+
+RegisterNUICallback('orgs:addGradePermission', function(data, cb)
+  sendServerRequest('mz_org:server:addGradePermission', data, cb)
+end)
+
+RegisterNUICallback('orgs:removeGradePermission', function(data, cb)
+  sendServerRequest('mz_org:server:removeGradePermission', data, cb)
+end)
+
 RegisterNUICallback('members:list', function(data, cb)
   sendServerRequest('mz_org:server:listMembers', data, cb)
 end)

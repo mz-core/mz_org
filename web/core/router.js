@@ -83,7 +83,8 @@
     { id: 'bank', label: 'Banco' },
     { id: 'goals', label: 'Metas' },
     { id: 'recruitment', label: 'Recrutamento' },
-    { id: 'logs', label: 'Logs' }
+    { id: 'logs', label: 'Logs' },
+    { id: 'actions', label: 'Acoes' }
   ];
 
   var sensitiveAuditActions = [
@@ -1739,7 +1740,9 @@
   function renderStaffOrgList(items) {
     return '<div class="staff-org-list"><table><thead><tr><th>Organizacao</th><th>Tipo</th><th>Membros</th><th>Status</th><th>Detalhes</th></tr></thead><tbody>' + items.map(function (org) {
       var members = Number.isFinite(Number(org.memberCount)) ? org.memberCount : '-';
-      return '<tr><td class="cell-strong">' + ui().safeText(org.name || org.code) + '<span class="cell-subtitle">' + ui().safeText(org.code || '-') + '</span></td><td>' + ui().badge(fmt().formatOrgType(org.type || 'legal'), staffOrgVariant(org.type)) + '</td><td>' + ui().safeText(members) + '</td><td>' + ui().badge(org.locked ? 'Bloqueada' : (org.is_public ? 'Publica' : 'Privada'), org.locked ? 'warning' : 'muted') + '</td><td><button class="btn btn-ghost" data-action="staff-view-org-details" data-org-code="' + ui().escapeHtml(org.code || '') + '">Ver detalhes</button></td></tr>';
+      var statusLabel = org.active === false ? 'Inativa' : (org.is_public ? 'Publica' : 'Privada');
+      var statusVariant = org.active === false ? 'warning' : (org.is_public ? 'info' : 'muted');
+      return '<tr><td class="cell-strong">' + ui().safeText(org.name || org.code) + '<span class="cell-subtitle">' + ui().safeText(org.code || '-') + '</span></td><td>' + ui().badge(fmt().formatOrgType(org.type || 'legal'), staffOrgVariant(org.type)) + '</td><td>' + ui().safeText(members) + '</td><td>' + ui().badge(org.locked ? 'Bloqueada' : statusLabel, org.locked ? 'warning' : statusVariant) + '</td><td><button class="btn btn-ghost" data-action="staff-view-org-details" data-org-code="' + ui().escapeHtml(org.code || '') + '">Ver detalhes</button></td></tr>';
     }).join('') + '</tbody></table></div>';
   }
 
@@ -1762,15 +1765,42 @@
     });
   }
 
-  function openStaffOrgDetails(orgCode) {
+  function openStaffOrgDetails(orgCode, options) {
     var current = state();
     var details = current.staffOrgDetails;
+    options = options || {};
     orgCode = String(orgCode || '').replace(/^\s+|\s+$/g, '');
     if (!orgCode) return;
 
+    var switchingOrg = details.orgCode !== orgCode;
+    if (switchingOrg) {
+      current.staffLeader.orgCode = '';
+      current.staffLeader.citizenid = '';
+      current.staffLeader.reason = '';
+      current.staffLeader.message = null;
+      current.staffLeader.error = null;
+      current.staffLeader.loading = false;
+      current.staffEditOrgBasic.open = false;
+      current.staffEditOrgBasic.orgCode = null;
+      current.staffEditOrgBasic.message = null;
+      current.staffEditOrgBasic.error = null;
+      current.staffEditOrgBasic.loading = false;
+      current.staffGradeModal.open = false;
+      current.staffGradeModal.loading = false;
+      current.staffGradeModal.message = null;
+      current.staffGradeModal.error = null;
+      current.staffArchiveModal.open = false;
+      current.staffArchiveModal.loading = false;
+      current.staffArchiveModal.error = null;
+      current.staffPermissionModal.open = false;
+      current.staffPermissionModal.loading = false;
+      current.staffPermissionModal.error = null;
+      current.staffPermissionModal.message = null;
+    }
+
     details.open = true;
     details.orgCode = orgCode;
-    details.activeTab = 'summary';
+    details.activeTab = options.tab || (switchingOrg ? 'summary' : details.activeTab) || 'summary';
     details.loading = true;
     details.error = null;
     details.data = {
@@ -1844,6 +1874,28 @@
     details.loading = false;
     details.error = null;
     details.data = null;
+    state().staffLeader.orgCode = '';
+    state().staffLeader.citizenid = '';
+    state().staffLeader.reason = '';
+    state().staffLeader.loading = false;
+    state().staffLeader.message = null;
+    state().staffLeader.error = null;
+    state().staffEditOrgBasic.open = false;
+    state().staffEditOrgBasic.orgCode = null;
+    state().staffEditOrgBasic.loading = false;
+    state().staffEditOrgBasic.message = null;
+    state().staffEditOrgBasic.error = null;
+    state().staffGradeModal.open = false;
+    state().staffGradeModal.loading = false;
+    state().staffGradeModal.message = null;
+    state().staffGradeModal.error = null;
+    state().staffArchiveModal.open = false;
+    state().staffArchiveModal.loading = false;
+    state().staffArchiveModal.error = null;
+    state().staffPermissionModal.open = false;
+    state().staffPermissionModal.loading = false;
+    state().staffPermissionModal.error = null;
+    state().staffPermissionModal.message = null;
     render();
   }
 
@@ -1897,6 +1949,7 @@
     if (tab === 'goals') return renderStaffOrgDetailGoals(data);
     if (tab === 'recruitment') return renderStaffOrgDetailRecruitment(data);
     if (tab === 'logs') return renderStaffOrgDetailLogs(data);
+    if (tab === 'actions') return renderStaffOrgDetailActions(data);
     return renderStaffOrgDetailSummary(data);
   }
 
@@ -1941,9 +1994,426 @@
     var access = data.access || {};
     var grades = Array.isArray(access.grades) ? access.grades : [];
     var baseCaps = Array.isArray(access.baseCapabilities) ? access.baseCapabilities : [];
+    var archived = isStaffDetailOrgArchived(data);
     var base = baseCaps.length ? capabilityBadges(baseCaps, 12) : ui().empty('Sem permissoes base', 'Nenhuma permissao base foi retornada.');
-    var body = grades.length ? renderGradesTable(grades) : ui().empty('Nenhum cargo retornado', 'O core nao retornou cargos para esta organizacao.');
-    return ui().card('Cargos e permissoes', 'Consulta read-only. Editor de cargos/permissoes fica para fase futura.', renderDetailBlockError(data, 'access') + '<div class="access-section"><h4>Permissoes base</h4>' + base + '</div><div class="access-section"><h4>Hierarquia</h4>' + body + '</div>', 'staff-org-detail-card');
+    var body = grades.length ? renderStaffGradesTable(grades, data) : ui().empty('Nenhum cargo retornado', 'O core nao retornou cargos para esta organizacao.');
+    var actions = archived
+      ? '<span class="soft-note">Organizacao arquivada: cargos ficam em consulta ate a reativacao.</span>'
+      : canManageStaffGrades()
+      ? '<button class="btn btn-primary" data-action="open-staff-grade-modal" data-grade-mode="create">Criar cargo</button>'
+      : '<span class="soft-note">Criar/editar cargos requer staff.orgs.manage.</span>';
+
+    return ui().card('Cargos e permissoes', 'Gerenciamento basico de cargos. Permissoes seguem apenas leitura nesta fase.', renderDetailBlockError(data, 'access') +
+      '<div class="staff-grade-toolbar"><p class="soft-note">Permissoes podem ser gerenciadas por cargo via catalogo oficial, sem campo livre.</p>' + actions + '</div>' +
+      '<div class="access-section"><h4>Permissoes base</h4>' + base + '</div><div class="access-section"><h4>Hierarquia</h4>' + body + '</div>' +
+      renderStaffGradeModal() + renderStaffArchiveModal() + renderStaffPermissionModal(), 'staff-org-detail-card');
+  }
+
+  function isStaffDetailOrgArchived(data) {
+    var org = data && data.org ? data.org : {};
+    return org.active === false || String(org.status || '').toLowerCase() === 'inactive';
+  }
+
+  function canManageStaffGrades() {
+    var current = state();
+    if (!current.session) return false;
+    if (current.session.user && current.session.user.isOwner) return true;
+    return perms().hasGlobalPermission(current.session, 'staff.orgs.manage');
+  }
+
+  function staffGradeMemberCounts(data) {
+    var out = {};
+    var members = Array.isArray(data.members) ? data.members : [];
+    members.forEach(function (member) {
+      var key = String(member.gradeLevel || member.grade || '');
+      if (!key) return;
+      out[key] = (out[key] || 0) + 1;
+    });
+    return out;
+  }
+
+  function renderStaffGradesTable(grades, data) {
+    var counts = staffGradeMemberCounts(data || {});
+    var archived = isStaffDetailOrgArchived(data);
+    var activeGrades = grades.filter(function (grade) { return grade.active !== false; });
+    var maxLevel = activeGrades.reduce(function (max, grade) {
+      return Math.max(max, Number(grade.level) || 0);
+    }, 0);
+
+    return '<div class="staff-org-detail-table"><table><thead><tr><th>Nivel</th><th>Cargo</th><th>Codigo</th><th>Salario</th><th>Prioridade</th><th>Heranca</th><th>Membros</th><th>Permissoes</th><th>Acoes</th></tr></thead><tbody>' + grades.map(function (grade) {
+      var caps = Array.isArray(grade.capabilities) ? grade.capabilities : [];
+      var level = Number(grade.level) || 0;
+      var active = grade.active !== false;
+      var memberCount = counts[String(level)] || 0;
+      var top = active && level === maxLevel;
+      var inheritance = grade.inheritsLevel ? 'Nivel ' + grade.inheritsLevel : 'Sem heranca';
+      var action = renderStaffGradeArchiveAction(grade, active, top, memberCount, archived);
+      var status = active ? (top ? '<span class="cell-subtitle">Cargo maximo</span>' : '') : '<span class="cell-subtitle">Desativado</span>';
+      return '<tr class="' + (active ? '' : 'is-muted-row') + '"><td>' + ui().badge('Nivel ' + level, top ? 'owner' : (active ? 'info' : 'muted')) + '</td><td class="cell-strong">' + ui().safeText(grade.name || grade.code) + status + '</td><td>' + ui().safeText(grade.code || '-') + '</td><td>' + ui().safeText(fmt().formatMoney(grade.salary || 0)) + '</td><td>' + ui().safeText(grade.priority == null ? '-' : grade.priority) + '</td><td>' + ui().safeText(inheritance) + '</td><td>' + ui().safeText(memberCount) + '</td><td>' + renderStaffGradePermissionsSummary(grade, caps) + '</td><td class="staff-grade-actions">' + action + '</td></tr>';
+    }).join('') + '</tbody></table></div>';
+  }
+
+  function renderStaffGradeArchiveAction(grade, active, top, memberCount, archived) {
+    if (!canManageStaffGrades()) return '<span class="soft-note">Sem permissao</span>';
+    if (archived) return '<span class="soft-note">Org arquivada</span>';
+    if (!active) {
+      return '<button class="btn btn-ghost" data-action="open-staff-archive-modal" data-staff-archive-action="reactivate-grade" data-grade-id="' + ui().escapeHtml(grade.id || '') + '">Reativar</button>';
+    }
+
+    var manage = '<button class="btn btn-ghost" data-action="open-staff-permission-modal" data-grade-id="' + ui().escapeHtml(grade.id || '') + '">Gerenciar permissoes</button>';
+    var edit = '<button class="btn btn-ghost" data-action="open-staff-grade-modal" data-grade-mode="edit" data-grade-id="' + ui().escapeHtml(grade.id || '') + '">Editar</button>';
+    if (top) return manage + edit + '<span class="soft-note">Cargo maximo protegido.</span>';
+    if (memberCount > 0) return manage + edit + '<span class="soft-note">Cargo possui membros.</span>';
+    return manage + edit + '<button class="btn btn-ghost danger" data-action="open-staff-archive-modal" data-staff-archive-action="disable-grade" data-grade-id="' + ui().escapeHtml(grade.id || '') + '">Desativar</button>';
+  }
+
+  function renderStaffGradePermissionsSummary(grade, caps) {
+    caps = Array.isArray(caps) ? caps : [];
+    if (!caps.length) {
+      return '<span class="staff-grade-permissions-summary muted">Sem permissoes</span>';
+    }
+
+    var preview = caps.slice(0, 3).map(function (capability) {
+      return fmt().formatCapabilityLabel(capability);
+    }).join(', ');
+    var extra = caps.length > 3 ? ' +' + (caps.length - 3) : '';
+    var chips = caps.map(function (capability) {
+      return '<span class="staff-grade-permission-chip">' + ui().safeText(fmt().formatCapabilityLabel(capability)) + '</span>';
+    }).join('');
+
+    return '<details class="staff-grade-permissions-panel">' +
+      '<summary class="staff-grade-permissions-toggle"><span class="staff-grade-permissions-summary">' + ui().safeText(caps.length + ' permissoes') + '</span><small>' + ui().safeText(preview + extra) + '</small></summary>' +
+      '<div class="staff-grade-permission-list">' + chips + '</div>' +
+    '</details>';
+  }
+
+  function isStaffPermission(permission) {
+    return String(permission || '').indexOf('staff.') === 0;
+  }
+
+  function isSensitiveGradePermission(permission) {
+    permission = String(permission || '');
+    return permission === 'members.set_leader' || isStaffPermission(permission);
+  }
+
+  function isStaffOrgDetail(data) {
+    var org = data && data.org ? data.org : {};
+    var type = String(org.type || org.typeCode || org.type_code || '').toLowerCase();
+    return type === 'staff';
+  }
+
+  function findStaffDetailGrade(gradeId) {
+    var data = staffOrgDetailData();
+    var grades = data.access && Array.isArray(data.access.grades) ? data.access.grades : [];
+    return grades.find(function (grade) { return String(grade.id) === String(gradeId); }) || null;
+  }
+
+  function openStaffPermissionModal(gradeId) {
+    var current = state();
+    var modal = current.staffPermissionModal;
+    var data = staffOrgDetailData();
+    var grade = findStaffDetailGrade(gradeId);
+
+    if (!canManageStaffGrades()) return;
+    if (!grade || isStaffDetailOrgArchived(data) || grade.active === false) return;
+
+    modal.open = true;
+    modal.gradeId = grade.id;
+    modal.selectedPermission = '';
+    modal.search = '';
+    modal.reason = '';
+    modal.loading = false;
+    modal.error = null;
+    modal.message = null;
+    render();
+  }
+
+  function closeStaffPermissionModal() {
+    var modal = state().staffPermissionModal;
+    if (modal.loading) return;
+    modal.open = false;
+    modal.error = null;
+    render();
+  }
+
+  function renderStaffPermissionModal() {
+    var current = state();
+    var modal = current.staffPermissionModal || {};
+    if (!modal.open) return '';
+
+    var data = staffOrgDetailData();
+    var grade = findStaffDetailGrade(modal.gradeId) || {};
+    var direct = Array.isArray(grade.directCapabilities) ? grade.directCapabilities : [];
+    var resolved = Array.isArray(grade.capabilities) ? grade.capabilities : [];
+    var inherited = resolved.filter(function (capability) { return direct.indexOf(capability) === -1; });
+    var error = modal.error ? '<div class="staff-org-modal-error">' + ui().safeText(formatStaffPermissionError(modal.error)) + '</div>' : '';
+    var search = String(modal.search || '').toLowerCase();
+    var catalog = fmt().getCapabilityCatalog().map(function (group) {
+      var permissions = group.permissions.filter(function (permission) {
+        if (!isStaffOrgDetail(data) && isStaffPermission(permission)) return false;
+        if (!search) return true;
+        return permission.toLowerCase().indexOf(search) !== -1 || fmt().formatCapabilityLabel(permission).toLowerCase().indexOf(search) !== -1;
+      });
+      return { id: group.id, label: group.label, permissions: permissions };
+    }).filter(function (group) { return group.permissions.length; });
+
+    var currentList = direct.length
+      ? direct.map(function (permission) {
+        return '<div class="staff-permission-row"><span>' + ui().safeText(fmt().formatCapabilityLabel(permission)) + (isSensitiveGradePermission(permission) ? '<small>Sensivel</small>' : '') + '</span><button class="btn btn-ghost danger" data-action="remove-staff-grade-permission" data-permission="' + ui().escapeHtml(permission) + '" ' + (modal.loading ? 'disabled' : '') + '>Remover</button></div>';
+      }).join('')
+      : ui().empty('Sem permissoes diretas', 'Este cargo usa apenas permissoes base/herdadas ou nenhuma permissao.');
+
+    var inheritedList = inherited.length
+      ? '<div class="staff-permission-inherited"><strong>Herdadas/base</strong><div class="badge-row">' + inherited.slice(0, 16).map(function (permission) { return ui().permissionBadge(permission, 'muted'); }).join('') + (inherited.length > 16 ? ui().badge('+' + (inherited.length - 16), 'muted') : '') + '</div></div>'
+      : '';
+
+    var catalogList = catalog.length
+      ? catalog.map(function (group) {
+        return '<section class="staff-permission-group"><h4>' + ui().safeText(group.label) + '</h4>' + group.permissions.map(function (permission) {
+          var exists = direct.indexOf(permission) !== -1;
+          var sensitive = isSensitiveGradePermission(permission);
+          return '<div class="staff-permission-row ' + (exists ? 'is-muted-row' : '') + '"><span>' + ui().safeText(fmt().formatCapabilityLabel(permission)) + '<small>' + ui().safeText(permission) + (sensitive ? ' - sensivel' : '') + '</small></span><button class="btn btn-ghost" data-action="add-staff-grade-permission" data-permission="' + ui().escapeHtml(permission) + '" ' + (exists || modal.loading ? 'disabled' : '') + '>' + (exists ? 'Ja possui' : 'Adicionar') + '</button></div>';
+        }).join('') + '</section>';
+      }).join('')
+      : ui().empty('Nenhuma permissao encontrada', 'Ajuste a busca ou selecione outro grupo.');
+
+    return '<div class="staff-org-modal-backdrop" role="presentation">' +
+      '<section class="staff-org-modal staff-permission-modal" role="dialog" aria-modal="true" aria-label="Gerenciar permissoes">' +
+        '<div class="staff-org-modal-header"><div><span>Staff</span><h3>Permissoes de ' + ui().safeText(grade.name || grade.code || 'cargo') + '</h3><p>Escolha somente permissoes da lista oficial. Nao ha campo livre de capability.</p></div><button class="modal-close" data-action="close-staff-permission-modal" aria-label="Cancelar">x</button></div>' +
+        '<div class="staff-org-modal-body">' +
+          '<label class="staff-org-modal-wide"><span>Buscar permissao</span><input data-staff-permission-field="search" maxlength="80" value="' + ui().safeText(modal.search) + '" placeholder="Buscar por nome ou capability" ' + (modal.loading ? 'disabled' : '') + ' /></label>' +
+          '<label class="staff-org-modal-wide"><span>Motivo opcional</span><textarea data-staff-permission-field="reason" maxlength="255" rows="2" placeholder="Motivo para auditoria" ' + (modal.loading ? 'disabled' : '') + '>' + ui().safeText(modal.reason) + '</textarea></label>' +
+          '<section class="staff-permission-panel staff-org-modal-wide"><h4>Permissoes diretas</h4>' + currentList + inheritedList + '</section>' +
+          '<section class="staff-permission-panel staff-org-modal-wide"><h4>Adicionar permissao</h4>' + catalogList + '</section>' +
+          '<small class="soft-note staff-org-modal-wide">Permissoes staff ficam ocultas fora de org tipo Staff. Permissoes sensiveis continuam validadas no server.</small>' +
+          error +
+        '</div>' +
+        '<div class="staff-org-modal-actions">' +
+          '<button class="btn btn-ghost" data-action="close-staff-permission-modal" ' + (modal.loading ? 'disabled' : '') + '>Fechar</button>' +
+        '</div>' +
+      '</section>' +
+    '</div>';
+  }
+
+  function formatStaffPermissionError(error) {
+    var key = String(error || '').toLowerCase();
+    if (key.indexOf('invalid_permission') !== -1 || key.indexOf('permissao invalida') !== -1) return 'Permissao invalida.';
+    if (key.indexOf('permission_not_allowed_for_org_type') !== -1) return 'Esta permissao nao e permitida para este tipo de organizacao.';
+    if (key.indexOf('permission_not_allowed') !== -1) return 'Esta permissao nao pode ser adicionada aqui.';
+    if (key.indexOf('sensitive_permission_requires_owner') !== -1) return 'Esta permissao sensivel exige owner.';
+    if (key.indexOf('leader_permission_required') !== -1) return 'Definir lideranca exige permissao forte.';
+    if (key.indexOf('permission_already_exists') !== -1) return 'Este cargo ja possui essa permissao.';
+    if (key.indexOf('permission_not_found') !== -1) return 'Permissao nao encontrada neste cargo.';
+    if (key.indexOf('org_archived') !== -1 || key.indexOf('arquivada') !== -1) return 'Organizacao arquivada nao pode ser alterada.';
+    if (key.indexOf('grade_inactive') !== -1 || key.indexOf('inativo') !== -1) return 'Cargo inativo nao pode ser alterado.';
+    if (key.indexOf('forbidden') !== -1 || key.indexOf('permiss') !== -1) return 'Voce nao tem permissao para gerenciar permissoes.';
+    if (key.indexOf('rate_limited') !== -1 || key.indexOf('aguarde') !== -1) return 'Aguarde alguns segundos e tente novamente.';
+    return error || 'Nao foi possivel alterar a permissao.';
+  }
+
+  function updateStaffPermissionModalFields() {
+    var modal = state().staffPermissionModal;
+    var app = document.getElementById('app');
+    var search = app && app.querySelector('[data-staff-permission-field="search"]');
+    var reason = app && app.querySelector('[data-staff-permission-field="reason"]');
+    modal.search = search ? search.value.replace(/^\s+|\s+$/g, '') : (modal.search || '');
+    modal.reason = reason ? reason.value.replace(/^\s+|\s+$/g, '') : (modal.reason || '');
+  }
+
+  function changeStaffGradePermission(action, permission) {
+    var current = state();
+    var modal = current.staffPermissionModal;
+    var details = current.staffOrgDetails || {};
+    var orgCode = String(details.orgCode || '').replace(/^\s+|\s+$/g, '');
+    var gradeId = modal.gradeId;
+
+    updateStaffPermissionModalFields();
+    modal.error = null;
+
+    if (!orgCode) { modal.error = 'Organizacao invalida.'; render(); return; }
+    if (!gradeId) { modal.error = 'Cargo invalido.'; render(); return; }
+    if (!permission) { modal.error = 'Permissao invalida.'; render(); return; }
+
+    modal.loading = true;
+    render();
+
+    var request = action === 'remove'
+      ? window.MZOrgService.removeGradePermission(orgCode, gradeId, permission, modal.reason)
+      : window.MZOrgService.addGradePermission(orgCode, gradeId, permission, modal.reason);
+
+    request.then(function () {
+      modal.open = false;
+      modal.error = null;
+      return openStaffOrgDetails(orgCode, { tab: 'grades' });
+    }).catch(function (err) {
+      modal.error = formatStaffPermissionError(err.message);
+    }).finally(function () {
+      modal.loading = false;
+      render();
+    });
+  }
+
+  function openStaffGradeModal(mode, gradeId) {
+    var current = state();
+    var modal = current.staffGradeModal;
+    var data = staffOrgDetailData();
+    var grades = data.access && Array.isArray(data.access.grades) ? data.access.grades : [];
+    var grade = null;
+
+    if (!canManageStaffGrades()) return;
+    if (isStaffDetailOrgArchived(data)) return;
+
+    if (mode === 'edit') {
+      grade = grades.find(function (item) { return String(item.id) === String(gradeId); });
+      if (!grade) return;
+    }
+
+    modal.open = true;
+    modal.mode = mode === 'edit' ? 'edit' : 'create';
+    modal.gradeId = grade ? grade.id : null;
+    modal.code = grade ? (grade.code || '') : '';
+    modal.name = grade ? (grade.name || '') : '';
+    modal.level = grade ? String(grade.level || '') : '';
+    modal.salary = grade ? String(grade.salary || 0) : '0';
+    modal.priority = grade && grade.priority != null ? String(grade.priority) : (grade ? String(grade.level || '') : '');
+    modal.inheritsLevel = grade && grade.inheritsLevel ? String(grade.inheritsLevel) : '';
+    modal.reason = '';
+    modal.loading = false;
+    modal.message = null;
+    modal.error = null;
+    render();
+  }
+
+  function closeStaffGradeModal() {
+    var modal = state().staffGradeModal;
+    if (modal.loading) return;
+    modal.open = false;
+    modal.error = null;
+    render();
+  }
+
+  function renderStaffGradeModal() {
+    var current = state();
+    var modal = current.staffGradeModal || {};
+    if (!modal.open) return '';
+
+    var data = staffOrgDetailData();
+    var grades = data.access && Array.isArray(data.access.grades) ? data.access.grades : [];
+    var isEdit = modal.mode === 'edit';
+    var inheritanceOptions = '<option value="">Sem heranca</option>' + grades.filter(function (grade) {
+      if (grade.active === false) return false;
+      return !isEdit || String(grade.id) !== String(modal.gradeId);
+    }).map(function (grade) {
+      var value = String(grade.level || '');
+      return '<option value="' + ui().escapeHtml(value) + '"' + (String(modal.inheritsLevel || '') === value ? ' selected' : '') + '>Nivel ' + ui().safeText(grade.level) + ' - ' + ui().safeText(grade.name || grade.code) + '</option>';
+    }).join('');
+
+    var error = modal.error ? '<div class="staff-org-modal-error">' + ui().safeText(formatStaffGradeError(modal.error)) + '</div>' : '';
+    return '<div class="staff-org-modal-backdrop" role="presentation">' +
+      '<section class="staff-org-modal" role="dialog" aria-modal="true" aria-label="' + ui().safeText(isEdit ? 'Editar cargo' : 'Criar cargo') + '">' +
+        '<div class="staff-org-modal-header"><div><span>Staff</span><h3>' + ui().safeText(isEdit ? 'Editar cargo' : 'Criar cargo') + '</h3><p>Permissoes continuam apenas leitura nesta fase.</p></div><button class="modal-close" data-action="close-staff-grade-modal" aria-label="Cancelar">x</button></div>' +
+        '<div class="staff-org-modal-body">' +
+          (isEdit ? '<label><span>Codigo</span><input value="' + ui().safeText(modal.code) + '" disabled /></label>' : '<label><span>Codigo</span><input data-staff-grade-field="code" maxlength="48" value="' + ui().safeText(modal.code) + '" placeholder="Ex: sub_lider" ' + (modal.loading ? 'disabled' : '') + ' /></label>') +
+          '<label><span>Nome</span><input data-staff-grade-field="name" maxlength="120" value="' + ui().safeText(modal.name) + '" placeholder="Nome do cargo" ' + (modal.loading ? 'disabled' : '') + ' /></label>' +
+          '<label><span>Nivel</span><input data-staff-grade-field="level" type="number" min="1" max="1000" value="' + ui().safeText(modal.level) + '" ' + (modal.loading ? 'disabled' : '') + ' /></label>' +
+          '<label><span>Salario</span><input data-staff-grade-field="salary" type="number" min="0" max="100000000" value="' + ui().safeText(modal.salary) + '" ' + (modal.loading ? 'disabled' : '') + ' /></label>' +
+          '<label><span>Prioridade</span><input data-staff-grade-field="priority" type="number" min="0" max="1000" value="' + ui().safeText(modal.priority) + '" ' + (modal.loading ? 'disabled' : '') + ' /></label>' +
+          '<label><span>Herda de</span><select data-staff-grade-field="inheritsLevel" ' + (modal.loading ? 'disabled' : '') + '>' + inheritanceOptions + '</select></label>' +
+          '<label class="staff-org-modal-wide"><span>Motivo opcional</span><textarea data-staff-grade-field="reason" maxlength="255" rows="3" placeholder="Motivo para auditoria" ' + (modal.loading ? 'disabled' : '') + '>' + ui().safeText(modal.reason) + '</textarea></label>' +
+          '<small class="soft-note staff-org-modal-wide">Criar ou mover cargo acima da lideranca atual pode exigir staff.orgs.set_leader. Permissoes nao sao editadas aqui.</small>' +
+          error +
+        '</div>' +
+        '<div class="staff-org-modal-actions">' +
+          '<button class="btn btn-ghost" data-action="close-staff-grade-modal" ' + (modal.loading ? 'disabled' : '') + '>Cancelar</button>' +
+          '<button class="btn btn-primary" data-action="submit-staff-grade-modal" ' + (modal.loading ? 'disabled' : '') + '>' + ui().safeText(modal.loading ? 'Salvando...' : 'Salvar') + '</button>' +
+        '</div>' +
+      '</section>' +
+    '</div>';
+  }
+
+  function formatStaffGradeError(error) {
+    var key = String(error || '').toLowerCase();
+    if (key.indexOf('org_archived') !== -1 || key.indexOf('arquivada') !== -1) return 'Organizacao arquivada. Reative antes de gerenciar cargos.';
+    if (key.indexOf('invalid_org') !== -1 || key.indexOf('organizacao invalida') !== -1) return 'Organizacao invalida.';
+    if (key.indexOf('org_not_found') !== -1 || key.indexOf('nao encontrada') !== -1) return 'Organizacao nao encontrada.';
+    if (key.indexOf('invalid_grade') !== -1) return 'Cargo invalido.';
+    if (key.indexOf('grade_not_found') !== -1) return 'Cargo nao encontrado.';
+    if (key.indexOf('invalid_code') !== -1 || key.indexOf('codigo') !== -1) return 'Informe um codigo valido para o cargo.';
+    if (key.indexOf('invalid_name') !== -1 || key.indexOf('nome') !== -1) return 'Informe um nome valido para o cargo.';
+    if (key.indexOf('invalid_level') !== -1 || key.indexOf('nivel') !== -1) return 'Informe um nivel valido.';
+    if (key.indexOf('grade_code_conflict') !== -1 || key.indexOf('codigo') !== -1 && key.indexOf('existe') !== -1) return 'Ja existe um cargo com esse codigo.';
+    if (key.indexOf('grade_level_conflict') !== -1 || key.indexOf('nivel') !== -1 && key.indexOf('existe') !== -1) return 'Ja existe um cargo nesse nivel.';
+    if (key.indexOf('invalid_salary') !== -1 || key.indexOf('salario') !== -1) return 'Informe um salario valido.';
+    if (key.indexOf('invalid_inheritance') !== -1 || key.indexOf('heranca') !== -1) return 'Heranca de cargo invalida.';
+    if (key.indexOf('inheritance_cycle') !== -1 || key.indexOf('ciclo') !== -1) return 'A heranca criaria um ciclo invalido.';
+    if (key.indexOf('forbidden') !== -1 || key.indexOf('permiss') !== -1) return 'Voce nao tem permissao para gerenciar cargos.';
+    if (key.indexOf('leader_permission_required') !== -1 || key.indexOf('lideranca') !== -1) return 'Alterar cargo maximo exige permissao de lideranca.';
+    if (key.indexOf('grade_in_use') !== -1) return 'Este cargo possui membros e nao pode ser desativado.';
+    if (key.indexOf('top_grade_protected') !== -1) return 'Cargo maximo protegido.';
+    if (key.indexOf('grade_already_disabled') !== -1 || key.indexOf('ja esta desativado') !== -1) return 'Cargo ja esta desativado.';
+    if (key.indexOf('grade_already_active') !== -1 || key.indexOf('ja esta ativo') !== -1) return 'Cargo ja esta ativo.';
+    if (key.indexOf('create_grade_failed') !== -1) return 'Nao foi possivel criar o cargo.';
+    if (key.indexOf('update_grade_failed') !== -1) return 'Nao foi possivel atualizar o cargo.';
+    if (key.indexOf('rate_limited') !== -1 || key.indexOf('aguarde') !== -1) return 'Aguarde alguns segundos e tente novamente.';
+    return error || 'Nao foi possivel salvar o cargo.';
+  }
+
+  function submitStaffGradeModal() {
+    var current = state();
+    var modal = current.staffGradeModal;
+    var details = current.staffOrgDetails || {};
+    var orgCode = String(details.orgCode || '').replace(/^\s+|\s+$/g, '');
+    var detailData = staffOrgDetailData();
+    var app = document.getElementById('app');
+
+    function field(name) {
+      var input = app && app.querySelector('[data-staff-grade-field="' + name + '"]');
+      return input ? input.value.replace(/^\s+|\s+$/g, '') : (modal[name] || '');
+    }
+
+    modal.code = modal.mode === 'edit' ? modal.code : field('code');
+    modal.name = field('name');
+    modal.level = field('level');
+    modal.salary = field('salary') || '0';
+    modal.priority = field('priority');
+    modal.inheritsLevel = field('inheritsLevel');
+    modal.reason = field('reason');
+    modal.error = null;
+
+    if (!orgCode) { modal.error = 'Organizacao invalida.'; render(); return; }
+    if (isStaffDetailOrgArchived(detailData)) { modal.error = 'Organizacao arquivada. Reative antes de gerenciar cargos.'; render(); return; }
+    if (modal.mode !== 'edit' && !modal.code) { modal.error = 'Informe um codigo valido para o cargo.'; render(); return; }
+    if (!modal.name) { modal.error = 'Informe um nome valido para o cargo.'; render(); return; }
+    if (!modal.level) { modal.error = 'Informe um nivel valido.'; render(); return; }
+
+    modal.loading = true;
+    render();
+
+    var payload = {
+      code: modal.code,
+      name: modal.name,
+      level: Number(modal.level),
+      salary: Number(modal.salary || 0),
+      priority: modal.priority === '' ? undefined : Number(modal.priority),
+      inheritsLevel: modal.inheritsLevel === '' ? undefined : Number(modal.inheritsLevel),
+      reason: modal.reason
+    };
+
+    var request = modal.mode === 'edit'
+      ? window.MZOrgService.updateOrgGradeBasic(orgCode, modal.gradeId, payload)
+      : window.MZOrgService.createOrgGrade(orgCode, payload);
+
+    request.then(function () {
+      modal.message = modal.mode === 'edit' ? 'Cargo atualizado.' : 'Cargo criado.';
+      modal.open = false;
+      modal.error = null;
+      openStaffOrgDetails(orgCode, { tab: 'grades' });
+    }).catch(function (err) {
+      modal.error = formatStaffGradeError(err.message);
+    }).finally(function () {
+      modal.loading = false;
+      render();
+    });
   }
 
   function renderStaffOrgDetailMembers(data) {
@@ -1995,6 +2465,391 @@
   function renderStaffOrgDetailLogs(data) {
     var logs = Array.isArray(data.logs) ? data.logs : [];
     return ui().card('Logs recentes', 'Eventos filtrados pela org, sem payload tecnico bruto.', renderDetailBlockError(data, 'logs') + renderStaffLogList(logs, 'Nenhum log recente retornado para esta org.'), 'staff-org-detail-card');
+  }
+
+  function renderStaffOrgDetailActions(data) {
+    return '<section class="staff-org-actions">' +
+      renderStaffDetailLeaderCard(data) +
+      '<div class="staff-org-action-grid">' +
+        renderStaffEditOrgBasicCard(data) +
+        renderDisabledStaffOrgAction('Gerenciar cargos', 'Use a aba Cargos para criar, editar, desativar ou reativar grades.') +
+        renderDisabledStaffOrgAction('Gerenciar permissoes', 'Editor de capabilities nao faz parte desta fase.') +
+        renderStaffArchiveOrgCard(data) +
+        renderDisabledStaffOrgAction('Excluir organizacao', 'Exclusao de org nao faz parte desta fase.') +
+      '</div>' +
+      renderStaffEditOrgBasicModal() +
+      renderStaffArchiveModal() +
+    '</section>';
+  }
+
+  function renderDisabledStaffOrgAction(title, description) {
+    return '<section class="staff-org-action-card is-disabled">' +
+      '<div class="badge-row">' + ui().badge('Em fase futura', 'muted') + '</div>' +
+      '<span><strong>' + ui().safeText(title) + '</strong><small>' + ui().safeText(description) + '</small></span>' +
+    '</section>';
+  }
+
+  function canUpdateStaffOrgBasic() {
+    var current = state();
+    if (!current.session) return false;
+    if (current.session.user && current.session.user.isOwner) return true;
+    return perms().hasGlobalPermission(current.session, 'staff.orgs.manage');
+  }
+
+  function renderStaffArchiveOrgCard(data) {
+    var archived = isStaffDetailOrgArchived(data);
+    var title = archived ? 'Reativar organizacao' : 'Arquivar organizacao';
+    var description = archived
+      ? 'Reativa a organizacao sem alterar historico, membros, banco, metas ou logs.'
+      : 'Arquiva sem apagar historico, membros, banco, metas, recrutamento ou logs.';
+
+    if (!canUpdateStaffOrgBasic()) {
+      return '<section class="staff-org-action-card is-disabled">' +
+        '<div class="badge-row">' + ui().badge('Bloqueado', 'warning') + '</div>' +
+        '<span><strong>' + ui().safeText(title) + '</strong><small>Voce nao tem permissao para arquivar ou reativar.</small></span>' +
+      '</section>';
+    }
+
+    return '<button class="staff-org-action-card" data-action="open-staff-archive-modal" data-staff-archive-action="' + (archived ? 'reactivate-org' : 'archive-org') + '">' +
+      '<div class="badge-row">' + ui().badge(archived ? 'Reativar' : 'Soft archive', archived ? 'success' : 'warning') + '</div>' +
+      '<span><strong>' + ui().safeText(title) + '</strong><small>' + ui().safeText(description) + '</small></span>' +
+    '</button>';
+  }
+
+  function openStaffArchiveModal(action, gradeId) {
+    var current = state();
+    var details = current.staffOrgDetails || {};
+    var data = staffOrgDetailData();
+    var modal = current.staffArchiveModal;
+    var org = (data && data.org) || {};
+    var grades = data.access && Array.isArray(data.access.grades) ? data.access.grades : [];
+    var grade = gradeId ? grades.find(function (item) { return String(item.id) === String(gradeId); }) : null;
+
+    if (!details.orgCode || !canUpdateStaffOrgBasic()) return;
+
+    modal.open = true;
+    modal.action = action;
+    modal.orgCode = details.orgCode;
+    modal.gradeId = grade ? grade.id : null;
+    modal.reason = '';
+    modal.loading = false;
+    modal.error = null;
+
+    if (action === 'archive-org') {
+      modal.title = 'Arquivar organizacao';
+      modal.description = 'Arquivar nao apaga historico, membros, banco, logs, metas ou recrutamento. A org ficara somente consulta ate ser reativada.';
+    } else if (action === 'reactivate-org') {
+      modal.title = 'Reativar organizacao';
+      modal.description = 'A organizacao voltara a aceitar operacoes normais. Historico e dados existentes permanecem preservados.';
+    } else if (action === 'disable-grade') {
+      if (!grade) return;
+      modal.title = 'Desativar cargo';
+      modal.description = 'O cargo "' + (grade.name || grade.code || '-') + '" sera ocultado de novas operacoes. Nada sera apagado.';
+    } else if (action === 'reactivate-grade') {
+      if (!grade) return;
+      modal.title = 'Reativar cargo';
+      modal.description = 'O cargo "' + (grade.name || grade.code || '-') + '" voltara a ficar disponivel.';
+    } else {
+      modal.open = false;
+      return;
+    }
+
+    if (org.name && (action === 'archive-org' || action === 'reactivate-org')) {
+      modal.description += ' Organizacao: ' + org.name + ' (' + details.orgCode + ').';
+    }
+
+    render();
+  }
+
+  function closeStaffArchiveModal() {
+    var modal = state().staffArchiveModal;
+    if (modal.loading) return;
+    modal.open = false;
+    modal.error = null;
+    render();
+  }
+
+  function renderStaffArchiveModal() {
+    var modal = state().staffArchiveModal || {};
+    if (!modal.open) return '';
+
+    var error = modal.error ? '<div class="staff-org-modal-error">' + ui().safeText(formatStaffArchiveError(modal.error)) + '</div>' : '';
+    return '<div class="staff-org-modal-backdrop" role="presentation">' +
+      '<section class="staff-org-modal" role="dialog" aria-modal="true" aria-label="' + ui().safeText(modal.title || 'Confirmar acao') + '">' +
+        '<div class="staff-org-modal-header"><div><span>Staff</span><h3>' + ui().safeText(modal.title || 'Confirmar acao') + '</h3><p>' + ui().safeText(modal.description || 'Confirme a acao administrativa.') + '</p></div><button class="modal-close" data-action="close-staff-archive-modal" aria-label="Cancelar">x</button></div>' +
+        '<div class="staff-org-modal-body">' +
+          '<label class="staff-org-modal-wide"><span>Motivo opcional</span><textarea data-staff-archive-field="reason" maxlength="255" rows="3" placeholder="Motivo para auditoria" ' + (modal.loading ? 'disabled' : '') + '>' + ui().safeText(modal.reason) + '</textarea></label>' +
+          '<small class="soft-note staff-org-modal-wide">Esta acao usa arquivamento/desativacao segura. Nao ha DELETE fisico.</small>' +
+          error +
+        '</div>' +
+        '<div class="staff-org-modal-actions">' +
+          '<button class="btn btn-ghost" data-action="close-staff-archive-modal" ' + (modal.loading ? 'disabled' : '') + '>Cancelar</button>' +
+          '<button class="btn btn-primary" data-action="submit-staff-archive-modal" ' + (modal.loading ? 'disabled' : '') + '>' + ui().safeText(modal.loading ? 'Aplicando...' : 'Confirmar') + '</button>' +
+        '</div>' +
+      '</section>' +
+    '</div>';
+  }
+
+  function formatStaffArchiveError(error) {
+    var key = String(error || '').toLowerCase();
+    if (key.indexOf('invalid_org') !== -1 || key.indexOf('organizacao invalida') !== -1) return 'Organizacao invalida.';
+    if (key.indexOf('org_not_found') !== -1 || key.indexOf('nao encontrada') !== -1) return 'Organizacao nao encontrada.';
+    if (key.indexOf('forbidden') !== -1 || key.indexOf('permiss') !== -1) return 'Voce nao tem permissao para esta acao.';
+    if (key.indexOf('org_already_archived') !== -1 || key.indexOf('ja esta arquivada') !== -1) return 'Organizacao ja esta arquivada.';
+    if (key.indexOf('org_already_active') !== -1 || key.indexOf('ja esta ativa') !== -1) return 'Organizacao ja esta ativa.';
+    if (key.indexOf('protected_org') !== -1) return 'Esta organizacao nao pode ser arquivada nesta fase.';
+    if (key.indexOf('archive_org_failed') !== -1) return 'Nao foi possivel arquivar a organizacao.';
+    if (key.indexOf('reactivate_org_failed') !== -1) return 'Nao foi possivel reativar a organizacao.';
+    if (key.indexOf('grade_in_use') !== -1) return 'Este cargo possui membros e nao pode ser desativado.';
+    if (key.indexOf('top_grade_protected') !== -1) return 'Cargo maximo protegido.';
+    if (key.indexOf('grade_already_disabled') !== -1 || key.indexOf('ja esta desativado') !== -1) return 'Cargo ja esta desativado.';
+    if (key.indexOf('grade_already_active') !== -1 || key.indexOf('ja esta ativo') !== -1) return 'Cargo ja esta ativo.';
+    if (key.indexOf('disable_grade_failed') !== -1) return 'Nao foi possivel desativar o cargo.';
+    if (key.indexOf('reactivate_grade_failed') !== -1) return 'Nao foi possivel reativar o cargo.';
+    if (key.indexOf('rate_limited') !== -1 || key.indexOf('aguarde') !== -1) return 'Aguarde alguns segundos e tente novamente.';
+    return error || 'Nao foi possivel aplicar a acao.';
+  }
+
+  function submitStaffArchiveModal() {
+    var current = state();
+    var modal = current.staffArchiveModal;
+    var app = document.getElementById('app');
+    var reasonInput = app && app.querySelector('[data-staff-archive-field="reason"]');
+    var orgCode = String(modal.orgCode || (current.staffOrgDetails && current.staffOrgDetails.orgCode) || '').replace(/^\s+|\s+$/g, '');
+
+    modal.reason = reasonInput ? reasonInput.value.replace(/^\s+|\s+$/g, '') : (modal.reason || '');
+    modal.error = null;
+
+    if (!orgCode) { modal.error = 'Organizacao invalida.'; render(); return; }
+
+    modal.loading = true;
+    render();
+
+    var request;
+    if (modal.action === 'archive-org') {
+      request = window.MZOrgService.archiveOrg(orgCode, modal.reason);
+    } else if (modal.action === 'reactivate-org') {
+      request = window.MZOrgService.reactivateOrg(orgCode, modal.reason);
+    } else if (modal.action === 'disable-grade') {
+      request = window.MZOrgService.disableOrgGrade(orgCode, modal.gradeId, modal.reason);
+    } else if (modal.action === 'reactivate-grade') {
+      request = window.MZOrgService.reactivateOrgGrade(orgCode, modal.gradeId, modal.reason);
+    } else {
+      modal.loading = false;
+      modal.error = 'Acao invalida.';
+      render();
+      return;
+    }
+
+    request.then(function () {
+      var tab = modal.action.indexOf('grade') !== -1 ? 'grades' : 'actions';
+      modal.open = false;
+      modal.error = null;
+      return Promise.all([
+        loadOrgs(),
+        openStaffOrgDetails(orgCode, { tab: tab })
+      ]);
+    }).catch(function (err) {
+      modal.error = formatStaffArchiveError(err.message);
+    }).finally(function () {
+      modal.loading = false;
+      render();
+    });
+  }
+
+  function orgStatusFromOrg(org) {
+    if (org && org.status) return String(org.status).toLowerCase();
+    if (org && org.active === false) return 'inactive';
+    return org && (org.is_public || org.isPublic) ? 'public' : 'private';
+  }
+
+  function renderStaffEditOrgBasicCard(data) {
+    var current = state();
+    var form = current.staffEditOrgBasic || {};
+    var archived = isStaffDetailOrgArchived(data);
+    var message = form.message ? '<div class="inline-message success">' + ui().safeText(form.message) + '</div>' : '';
+    var error = form.error && !form.open ? '<div class="inline-message error-inline">' + ui().safeText(formatStaffEditOrgBasicError(form.error)) + '</div>' : '';
+
+    if (archived) {
+      return '<section class="staff-org-action-card is-disabled">' +
+        '<div class="badge-row">' + ui().badge('Somente consulta', 'muted') + '</div>' +
+        '<span><strong>Editar dados basicos</strong><small>Reative a organizacao antes de editar.</small></span>' +
+      '</section>';
+    }
+
+    if (!canUpdateStaffOrgBasic()) {
+      return '<section class="staff-org-action-card is-disabled">' +
+        '<div class="badge-row">' + ui().badge('Bloqueado', 'warning') + '</div>' +
+        '<span><strong>Editar dados basicos</strong><small>Voce nao tem permissao para editar dados basicos.</small></span>' +
+      '</section>';
+    }
+
+    return '<button class="staff-org-action-card" data-action="open-staff-edit-org-basic-modal">' +
+      '<div class="badge-row">' + ui().badge('staff.orgs.manage', 'info') + '</div>' +
+      '<span><strong>Editar dados basicos</strong><small>Nome, status publico/privado e flags operacionais.</small></span>' +
+      message + error +
+    '</button>';
+  }
+
+  function renderStaffDetailLeaderCard(data) {
+    var current = state();
+    var form = current.staffLeader || {};
+    var org = (data && data.org) || findStaffOrgByCode(current.staffOrgDetails.orgCode) || {};
+    var orgCode = current.staffOrgDetails.orgCode || org.code || '';
+    var message = form.message ? '<div class="inline-message success">' + ui().safeText(form.message) + '</div>' : '';
+    var error = form.error ? '<div class="inline-message error-inline">' + ui().safeText(formatStaffLeaderError(form.error)) + '</div>' : '';
+
+    if (isStaffDetailOrgArchived(data)) {
+      return ui().card('Definir lider', 'Acao administrativa restrita a esta organizacao.', '<div class="badge-row">' + ui().badge('Somente consulta', 'muted') + '</div><p class="soft-note">Reative a organizacao antes de definir lideranca.</p>', 'staff-org-detail-card');
+    }
+
+    if (!canShowStaffLeaderCard()) {
+      return ui().card('Definir lider', 'Acao administrativa restrita a esta organizacao.', '<div class="badge-row">' + ui().badge('Bloqueado', 'warning') + '</div><p class="soft-note">Voce nao tem permissao para definir lideranca.</p>', 'staff-org-detail-card');
+    }
+
+    return ui().card('Definir lider', 'Coloca um player na maior grade desta organizacao.', '<div class="staff-set-leader-form">' +
+      '<div class="staff-set-leader-hint staff-leader-wide"><span>Organizacao selecionada</span><strong>' + ui().safeText(org.name || orgCode || '-') + '</strong><small>' + ui().safeText(orgCode || '-') + '</small></div>' +
+      '<label><span>CitizenID</span><input data-staff-leader-field="citizenid" maxlength="64" value="' + ui().safeText(form.citizenid) + '" placeholder="CitizenID ou passaporte" ' + (form.loading ? 'disabled' : '') + ' /></label>' +
+      '<label><span>Motivo opcional</span><textarea data-staff-leader-field="reason" maxlength="255" rows="3" placeholder="Motivo para auditoria" ' + (form.loading ? 'disabled' : '') + '>' + ui().safeText(form.reason) + '</textarea></label>' +
+      '<p class="soft-note staff-leader-wide">O codigo da organizacao vem do detalhe selecionado. A NUI nao envia cargo, source, permissao ou grade.</p>' +
+      '<div class="staff-leader-actions"><button class="btn btn-primary" data-action="staff-set-leader" ' + (form.loading ? 'disabled' : '') + '>' + ui().safeText(form.loading ? 'Definindo...' : 'Definir lider') + '</button></div>' +
+      message + error +
+    '</div>', 'staff-org-detail-card');
+  }
+
+  function openStaffEditOrgBasicModal() {
+    var current = state();
+    var details = current.staffOrgDetails || {};
+    var data = details.data || {};
+    var org = data.org || findStaffOrgByCode(details.orgCode) || {};
+    var modal = current.staffEditOrgBasic;
+
+    if (!details.orgCode || !canUpdateStaffOrgBasic()) return;
+    if (isStaffDetailOrgArchived(data)) return;
+
+    modal.open = true;
+    modal.orgCode = details.orgCode;
+    modal.name = org.name || '';
+    modal.status = orgStatusFromOrg(org);
+    modal.hasSalary = org.hasSalary === true || org.has_salary === true;
+    modal.hasSharedAccount = org.hasSharedAccount === true || org.has_shared_account === true;
+    modal.hasStorage = org.hasStorage === true || org.has_storage === true;
+    modal.reason = '';
+    modal.loading = false;
+    modal.error = null;
+    modal.message = null;
+    render();
+  }
+
+  function closeStaffEditOrgBasicModal() {
+    var modal = state().staffEditOrgBasic;
+    if (modal.loading) return;
+    modal.open = false;
+    modal.error = null;
+    render();
+  }
+
+  function renderStaffEditOrgBasicModal() {
+    var modal = state().staffEditOrgBasic || {};
+    if (!modal.open) return '';
+
+    var error = modal.error ? '<div class="staff-org-modal-error">' + ui().safeText(formatStaffEditOrgBasicError(modal.error)) + '</div>' : '';
+    return '<div class="staff-org-modal-backdrop" role="presentation">' +
+      '<section class="staff-org-modal" role="dialog" aria-modal="true" aria-label="Editar dados basicos">' +
+        '<div class="staff-org-modal-header"><div><span>Staff</span><h3>Editar dados basicos</h3><p>Somente nome, status e flags da organizacao selecionada.</p></div><button class="modal-close" data-action="close-staff-edit-org-basic-modal" aria-label="Cancelar">x</button></div>' +
+        '<div class="staff-org-modal-body">' +
+          '<label><span>Nome</span><input data-staff-edit-org-basic-field="name" maxlength="120" value="' + ui().safeText(modal.name) + '" placeholder="Nome da organizacao" ' + (modal.loading ? 'disabled' : '') + ' /></label>' +
+          '<label><span>Status</span><select data-staff-edit-org-basic-field="status" ' + (modal.loading ? 'disabled' : '') + '>' +
+            '<option value="private"' + (modal.status === 'private' ? ' selected' : '') + '>Privada</option>' +
+            '<option value="public"' + (modal.status === 'public' ? ' selected' : '') + '>Publica</option>' +
+          '</select></label>' +
+          '<label class="toggle-line"><input data-staff-edit-org-basic-field="hasSharedAccount" type="checkbox" ' + (modal.hasSharedAccount ? 'checked' : '') + ' ' + (modal.loading ? 'disabled' : '') + ' /> <span>Conta compartilhada</span></label>' +
+          '<label class="toggle-line"><input data-staff-edit-org-basic-field="hasStorage" type="checkbox" ' + (modal.hasStorage ? 'checked' : '') + ' ' + (modal.loading ? 'disabled' : '') + ' /> <span>Bau/storage</span></label>' +
+          '<label class="toggle-line"><input data-staff-edit-org-basic-field="hasSalary" type="checkbox" ' + (modal.hasSalary ? 'checked' : '') + ' ' + (modal.loading ? 'disabled' : '') + ' /> <span>Salario</span></label>' +
+          '<label class="staff-org-modal-wide"><span>Motivo opcional</span><textarea data-staff-edit-org-basic-field="reason" maxlength="255" rows="3" placeholder="Motivo para auditoria" ' + (modal.loading ? 'disabled' : '') + '>' + ui().safeText(modal.reason) + '</textarea></label>' +
+          '<small class="soft-note staff-org-modal-wide">Nao e possivel alterar codigo, tipo, cargos, permissoes, membros ou banco por este modal.</small>' +
+          error +
+        '</div>' +
+        '<div class="staff-org-modal-actions">' +
+          '<button class="btn btn-ghost" data-action="close-staff-edit-org-basic-modal" ' + (modal.loading ? 'disabled' : '') + '>Cancelar</button>' +
+          '<button class="btn btn-primary" data-action="submit-staff-edit-org-basic-modal" ' + (modal.loading ? 'disabled' : '') + '>' + ui().safeText(modal.loading ? 'Salvando...' : 'Salvar') + '</button>' +
+        '</div>' +
+      '</section>' +
+    '</div>';
+  }
+
+  function formatStaffEditOrgBasicError(error) {
+    var key = String(error || '').toLowerCase();
+    if (key.indexOf('invalid_org') !== -1 || key.indexOf('organizacao invalida') !== -1) return 'Organizacao invalida.';
+    if (key.indexOf('org_not_found') !== -1 || key.indexOf('nao encontrada') !== -1) return 'Organizacao nao encontrada.';
+    if (key.indexOf('invalid_name') !== -1 || key.indexOf('nome') !== -1) return 'Informe um nome valido.';
+    if (key.indexOf('invalid_status') !== -1 || key.indexOf('status') !== -1) return 'Status invalido.';
+    if (key.indexOf('forbidden') !== -1 || key.indexOf('permiss') !== -1) return 'Voce nao tem permissao para editar esta organizacao.';
+    if (key.indexOf('rate_limited') !== -1 || key.indexOf('aguarde') !== -1) return 'Aguarde alguns segundos e tente novamente.';
+    return error || 'Nao foi possivel atualizar a organizacao.';
+  }
+
+  function submitStaffEditOrgBasicModal() {
+    var current = state();
+    var modal = current.staffEditOrgBasic;
+    var details = current.staffOrgDetails || {};
+    var orgCode = String(details.orgCode || modal.orgCode || '').replace(/^\s+|\s+$/g, '');
+    var app = document.getElementById('app');
+
+    function field(name) {
+      var input = app && app.querySelector('[data-staff-edit-org-basic-field="' + name + '"]');
+      if (!input) return modal[name] || '';
+      if (input.type === 'checkbox') return input.checked;
+      return input.value.replace(/^\s+|\s+$/g, '');
+    }
+
+    modal.name = field('name');
+    modal.status = field('status') || 'private';
+    modal.hasSalary = field('hasSalary') === true;
+    modal.hasSharedAccount = field('hasSharedAccount') === true;
+    modal.hasStorage = field('hasStorage') === true;
+    modal.reason = field('reason');
+    modal.error = null;
+    modal.message = null;
+
+    if (!orgCode) {
+      modal.error = 'Organizacao invalida.';
+      render();
+      return;
+    }
+
+    if (!modal.name) {
+      modal.error = 'Informe um nome valido.';
+      render();
+      return;
+    }
+
+    modal.loading = true;
+    render();
+
+    window.MZOrgService.updateOrgBasic(orgCode, {
+      name: modal.name,
+      status: modal.status,
+      hasSalary: modal.hasSalary,
+      hasSharedAccount: modal.hasSharedAccount,
+      hasStorage: modal.hasStorage,
+      reason: modal.reason
+    }).then(function (data) {
+      var org = data && data.org ? data.org : {};
+      modal.message = 'Dados basicos atualizados para ' + (org.name || modal.name) + '.';
+      modal.open = false;
+      modal.error = null;
+      current.orgs.loaded = false;
+      current.orgs.loadedKey = '';
+      current.orgs.data = [];
+      loadOrgs();
+      openStaffOrgDetails(orgCode, { tab: 'actions' });
+    }).catch(function (err) {
+      modal.error = formatStaffEditOrgBasicError(err.message);
+    }).finally(function () {
+      modal.loading = false;
+      render();
+    });
   }
 
   function canCreateStaffOrg() {
@@ -2229,12 +3084,8 @@
   }
 
   function renderStaffActionsSection() {
-    var leaderCard = canShowStaffLeaderCard()
-      ? renderStaffLeaderCard()
-      : ui().card('Definir lider', 'Acao administrativa restrita.', '<div class="badge-row">' + ui().badge('Bloqueado', 'warning') + '</div><p class="soft-note">Requer staff.orgs.set_leader ou owner.</p>', 'staff-leader-card');
-
     return '<div class="staff-action-grid">' +
-      leaderCard +
+      ui().card('Definir lider', 'A acao agora fica dentro da organizacao selecionada.', '<p class="soft-note">Use Organizacoes > Ver detalhes > Acoes para definir o lider de uma org/faccao. Assim o codigo da org vem do detalhe selecionado e nao de um campo manual.</p>', 'staff-leader-card') +
       renderDisabledStaffAction('Adicionar membro global', 'Criar membro em qualquer org sera uma fase propria com permissao forte.') +
       renderDisabledStaffAction('Remover membro global', 'Remocao administrativa global continua bloqueada nesta fase.') +
       renderDisabledStaffAction('Gerenciar staff', 'Hierarquia e gestao de staff permanecem fase futura.') +
@@ -2256,22 +3107,6 @@
     return perms().hasGlobalPermission(current.session, 'staff.orgs.set_leader');
   }
 
-  function renderStaffLeaderCard() {
-    var current = state();
-    var form = current.staffLeader || {};
-    var message = form.message ? '<div class="inline-message success">' + ui().safeText(form.message) + '</div>' : '';
-    var error = form.error ? '<div class="inline-message error-inline">' + ui().safeText(formatStaffLeaderError(form.error)) + '</div>' : '';
-
-    return ui().card('Definir lider de organizacao', 'Acao minima para testes e administracao.', '<div class="staff-leader-form">' +
-      '<label><span>Codigo da org/gang</span><input data-staff-leader-field="orgCode" maxlength="64" value="' + ui().safeText(form.orgCode) + '" placeholder="Ex: mafia" ' + (form.loading ? 'disabled' : '') + ' /></label>' +
-      '<label><span>CitizenID</span><input data-staff-leader-field="citizenid" maxlength="64" value="' + ui().safeText(form.citizenid) + '" placeholder="CitizenID ou passaporte" ' + (form.loading ? 'disabled' : '') + ' /></label>' +
-      '<label class="staff-leader-wide"><span>Motivo opcional</span><textarea data-staff-leader-field="reason" maxlength="255" rows="3" placeholder="Motivo para auditoria" ' + (form.loading ? 'disabled' : '') + '>' + ui().safeText(form.reason) + '</textarea></label>' +
-      '<p class="soft-note staff-leader-wide">Esta acao coloca o player na maior grade da organizacao selecionada. Requer staff.orgs.set_leader ou owner.</p>' +
-      '<div class="staff-leader-actions"><button class="btn btn-primary" data-action="staff-set-leader" ' + (form.loading ? 'disabled' : '') + '>' + ui().safeText(form.loading ? 'Definindo...' : 'Definir lider') + '</button></div>' +
-      message + error +
-    '</div>', 'staff-leader-card');
-  }
-
   function formatStaffLeaderError(error) {
     var key = String(error || '').toLowerCase();
     if (key.indexOf('invalid_org') !== -1 || key.indexOf('organizacao invalida') !== -1) return 'Organizacao invalida.';
@@ -2287,17 +3122,20 @@
     var current = state();
     var form = current.staffLeader;
     var app = document.getElementById('app');
+    var details = current.staffOrgDetails || {};
+    var detailData = details.data || {};
+    var detailOrg = detailData.org || {};
 
     function field(name) {
       var input = app && app.querySelector('[data-staff-leader-field="' + name + '"]');
       return input ? input.value.replace(/^\s+|\s+$/g, '') : (form[name] || '');
     }
 
-    var orgCode = field('orgCode');
+    var orgCode = String(details.orgCode || detailOrg.code || '').replace(/^\s+|\s+$/g, '');
     var citizenid = field('citizenid');
     var reason = field('reason');
 
-    form.orgCode = orgCode;
+    form.orgCode = '';
     form.citizenid = citizenid;
     form.reason = reason;
     form.message = null;
@@ -2320,9 +3158,9 @@
 
     window.MZOrgMemberService.setOrgLeader(orgCode, citizenid, reason).then(function (data) {
       form.message = 'Lider definido em ' + (data.orgName || data.orgCode || orgCode) + ' na grade ' + (data.gradeName || data.gradeCode || data.gradeLevel || 'maxima') + '.';
-      form.orgCode = '';
       form.citizenid = '';
       form.reason = '';
+      openStaffOrgDetails(orgCode, { tab: 'actions' });
     }).catch(function (err) {
       form.error = formatStaffLeaderError(err.message);
     }).finally(function () {
@@ -3164,6 +4002,80 @@
     var submitStaffCreateOrgButton = app.querySelector('[data-action="submit-staff-create-org-modal"]');
     if (submitStaffCreateOrgButton) {
       submitStaffCreateOrgButton.addEventListener('click', submitStaffCreateOrgModal);
+    }
+
+    var openStaffEditOrgBasicButton = app.querySelector('[data-action="open-staff-edit-org-basic-modal"]');
+    if (openStaffEditOrgBasicButton) {
+      openStaffEditOrgBasicButton.addEventListener('click', openStaffEditOrgBasicModal);
+    }
+
+    app.querySelectorAll('[data-action="close-staff-edit-org-basic-modal"]').forEach(function (button) {
+      button.addEventListener('click', closeStaffEditOrgBasicModal);
+    });
+
+    var submitStaffEditOrgBasicButton = app.querySelector('[data-action="submit-staff-edit-org-basic-modal"]');
+    if (submitStaffEditOrgBasicButton) {
+      submitStaffEditOrgBasicButton.addEventListener('click', submitStaffEditOrgBasicModal);
+    }
+
+    app.querySelectorAll('[data-action="open-staff-grade-modal"]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        openStaffGradeModal(button.getAttribute('data-grade-mode'), button.getAttribute('data-grade-id'));
+      });
+    });
+
+    app.querySelectorAll('[data-action="close-staff-grade-modal"]').forEach(function (button) {
+      button.addEventListener('click', closeStaffGradeModal);
+    });
+
+    var submitStaffGradeButton = app.querySelector('[data-action="submit-staff-grade-modal"]');
+    if (submitStaffGradeButton) {
+      submitStaffGradeButton.addEventListener('click', submitStaffGradeModal);
+    }
+
+    app.querySelectorAll('[data-action="open-staff-permission-modal"]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        openStaffPermissionModal(button.getAttribute('data-grade-id'));
+      });
+    });
+
+    app.querySelectorAll('[data-action="close-staff-permission-modal"]').forEach(function (button) {
+      button.addEventListener('click', closeStaffPermissionModal);
+    });
+
+    var permissionSearch = app.querySelector('[data-staff-permission-field="search"]');
+    if (permissionSearch) {
+      permissionSearch.addEventListener('input', function () {
+        updateStaffPermissionModalFields();
+        render();
+      });
+    }
+
+    app.querySelectorAll('[data-action="add-staff-grade-permission"]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        changeStaffGradePermission('add', button.getAttribute('data-permission'));
+      });
+    });
+
+    app.querySelectorAll('[data-action="remove-staff-grade-permission"]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        changeStaffGradePermission('remove', button.getAttribute('data-permission'));
+      });
+    });
+
+    app.querySelectorAll('[data-action="open-staff-archive-modal"]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        openStaffArchiveModal(button.getAttribute('data-staff-archive-action'), button.getAttribute('data-grade-id'));
+      });
+    });
+
+    app.querySelectorAll('[data-action="close-staff-archive-modal"]').forEach(function (button) {
+      button.addEventListener('click', closeStaffArchiveModal);
+    });
+
+    var submitStaffArchiveButton = app.querySelector('[data-action="submit-staff-archive-modal"]');
+    if (submitStaffArchiveButton) {
+      submitStaffArchiveButton.addEventListener('click', submitStaffArchiveModal);
     }
 
     app.querySelectorAll('[data-action="staff-view-org-details"]').forEach(function (button) {

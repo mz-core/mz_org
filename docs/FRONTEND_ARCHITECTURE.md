@@ -36,19 +36,21 @@ O header superior e contextual: no hub mostra `PAINEL GERAL / MZ Org`, em `/org`
 `/staff` usa `activeShell = 'staff'`, `activeOrgCode = null` e `activeSection` para as abas internas:
 
 - `overview`: metricas e resumo administrativo, sem atalhos duplicados.
-- `orgs`: lista de organizacoes retornadas por `orgs:list`, subview `Ver detalhes` read-only e modal restrita `Criar organizacao` quando houver owner/`staff.orgs.create`.
+- `orgs`: lista de organizacoes retornadas por `orgs:list`, subview `Ver detalhes`, aba `Acoes` do detalhe, modal restrita `Criar organizacao` quando houver owner/`staff.orgs.create` e modal `Editar dados basicos` quando houver owner/`staff.orgs.manage`.
 - `logs`: logs recentes retornados por `logs:list`, com filtros locais.
 - `audit`: recorte local de eventos sensiveis dentro dos logs recentes.
-- `actions`: acao real `Definir lider` e cards bloqueados para fases futuras.
+- `actions`: orientacao para usar `Organizacoes > Ver detalhes > Acoes` e cards bloqueados para fases futuras.
 
 O dashboard Staff reutiliza `orgs:list` e `logs:list` para leitura. Escritas reais atuais no Staff:
 
-- `members:setLeader`: define lider/top grade por `orgCode` e `citizenid`.
+- `members:setLeader`: define lider/top grade por `orgCode` e `citizenid`, acionado pela aba `Acoes` do detalhe da org.
 - `orgs:createFromTemplate`: cria org/faccao por templates seguros do servidor.
+- `orgs:updateBasic`: edita somente nome, status e flags basicas da org selecionada.
+- `orgs:createGrade` e `orgs:updateGradeBasic`: gerenciam dados basicos de cargos, sem editar permissoes.
 
 As demais acoes administrativas aparecem como bloqueadas/placeholder. Nao ha editor livre de cargos/permissoes, exclusao de org ou gestao global de staff.
 
-`Ver detalhes` em uma org usa estado proprio `staffOrgDetails` e carrega services existentes (`orgs:get`, `org-access:get`, `members:list`, `org-bank:*`, `goals:list`, `recruitment:list`, `logs:list`) sem mudar `activeOrgCode`. A subview possui abas `Resumo`, `Cargos`, `Membros`, `Banco`, `Metas`, `Recrutamento` e `Logs`, todas read-only.
+`Ver detalhes` em uma org usa estado proprio `staffOrgDetails` e carrega services existentes (`orgs:get`, `org-access:get`, `members:list`, `org-bank:*`, `goals:list`, `recruitment:list`, `logs:list`) sem mudar `activeOrgCode`. A subview possui abas `Resumo`, `Cargos`, `Membros`, `Banco`, `Metas`, `Recrutamento`, `Logs` e `Acoes`. A aba `Acoes` usa o orgCode da org selecionada; nao existe input manual de orgCode para lideranca. O modal `Editar dados basicos` usa estado proprio `staffEditOrgBasic` e nao permite alterar code, type, cargos ou permissoes. O modal de cargos usa `staffGradeModal`; criar envia `code`, mas editar nao altera `code` e nunca envia permissoes.
 
 ## Adicionar novo painel
 
@@ -73,7 +75,7 @@ As demais acoes administrativas aparecem como bloqueadas/placeholder. Nao ha edi
 - O frontend nunca deve aceitar `source` vindo da NUI como verdade.
 - Toda acao de escrita futura precisa de validacao server-side.
 - Acoes perigosas futuras devem validar `HasGlobalPermission`, `CanOrg`, rate limit e auditoria.
-- Actions reais atuais: `members:invite`, `members:remove`, `members:promote`, `members:demote`, `members:setLeader`, `orgs:createFromTemplate`, `org-bank:deposit`, `org-bank:withdraw`, `recruitment:create/approve/reject/cancel` e `goals:create`.
+- Actions reais atuais: `members:invite`, `members:remove`, `members:promote`, `members:demote`, `members:setLeader`, `orgs:createFromTemplate`, `orgs:updateBasic`, `orgs:createGrade`, `orgs:updateGradeBasic`, `org-bank:deposit`, `org-bank:withdraw`, `recruitment:create/approve/reject/cancel` e `goals:create`.
 - Nenhuma action deve enviar `source` ou `createdBy` como verdade.
 - Acoes sensiveis de membros usam confirmacao inline no painel, sem `alert`, `prompt` ou janela externa do navegador.
 
@@ -83,3 +85,25 @@ As demais acoes administrativas aparecem como bloqueadas/placeholder. Nao ha edi
 - Codigos internos, IDs e capabilities cruas ficam desativados na UI normal; se detalhes tecnicos voltarem em modo owner/debug, devem ficar colapsados e claramente separados.
 - Capabilities exibidas ao jogador devem passar por labels amigaveis em `formatCapabilityLabel`.
 - CitizenID completo nao deve aparecer em tabelas principais; use `maskCitizenId` e deixe o valor completo apenas no detalhe colapsado quando necessario.
+## Staff: arquivamento e cargos inativos
+
+- Acoes de arquivar/reativar org ficam no detalhe da org, aba `Acoes`.
+- Acoes de desativar/reativar cargo ficam no detalhe da org, aba `Cargos`.
+- O estado da confirmacao usa `state.staffArchiveModal`.
+- O frontend envia somente `orgCode`, `gradeId` quando aplicavel e `reason`.
+- `orgCode` vem sempre da org selecionada em `staffOrgDetails`; nao ha input manual para esta acao.
+- Cargos desativados aparecem em modo read-only com badge/estado visual.
+- Org arquivada fica somente consulta no detalhe Staff; o frontend bloqueia criar/editar cargos e definir lider ate reativar.
+- Permissoes de cargo podem ser gerenciadas pelo modal controlado, sem campo livre.
+
+## Staff: permissoes por cargo
+
+- O modal de permissoes fica em `state.staffPermissionModal`.
+- A tabela de cargos continua mostrando permissoes compactadas.
+- O botao `Gerenciar permissoes` abre um modal controlado para o cargo selecionado.
+- O modal nao possui campo livre de capability.
+- A lista oficial vem de `format.getCapabilityCatalog()`.
+- A UI oculta `staff.*` quando a org selecionada nao e tipo Staff.
+- Permissoes diretas podem ser removidas; permissoes herdadas/base aparecem somente como leitura.
+- O frontend envia somente `orgCode`, `gradeId`, `permission` e `reason`.
+- O server continua sendo a fonte da verdade para allowlist, org ativa, grade ativa e permissoes sensiveis.

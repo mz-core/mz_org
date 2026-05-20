@@ -72,10 +72,14 @@ local function normalizeGrade(row)
   if type(row) ~= 'table' then return nil end
 
   return {
+    id = tonumber(row.id) or row.id,
     level = tonumber(row.level) or 0,
     code = tostring(row.code or ''),
     name = tostring(row.name or ''),
     salary = tonumber(row.salary) or 0,
+    priority = tonumber(row.priority) or 0,
+    active = row.active ~= false,
+    inheritsGradeId = row.inheritsGradeId or row.inherits_grade_id,
     inheritsLevel = row.inheritsLevel or row.inherits_level,
     inheritsCode = row.inheritsCode or row.inherits_code,
     capabilities = normalizeList(row.capabilities),

@@ -123,6 +123,17 @@
     'mechanic.boss.actions': 'Acoes de chefia'
   };
 
+  var capabilityCatalog = [
+    { id: 'general', label: 'Geral', permissions: ['org.view'] },
+    { id: 'members', label: 'Membros', permissions: ['members.view', 'members.invite', 'members.remove', 'members.promote', 'members.demote', 'members.set_leader', 'manage.members', 'members.kick', 'members.suspend'] },
+    { id: 'bank', label: 'Banco', permissions: ['account.view', 'account.deposit', 'account.withdraw', 'account.manage', 'manage.account', 'account.transfer'] },
+    { id: 'goals', label: 'Metas', permissions: ['goals.view', 'goals.manage', 'manage.goals'] },
+    { id: 'recruitment', label: 'Recrutamento', permissions: ['recruitment.view', 'recruitment.manage'] },
+    { id: 'logs', label: 'Logs', permissions: ['logs.view'] },
+    { id: 'staff', label: 'Staff', permissions: ['staff.panel.open', 'staff.orgs.view', 'staff.orgs.manage', 'staff.orgs.create', 'staff.orgs.set_leader', 'staff.members.invite', 'staff.members.remove', 'staff.members.promote', 'staff.members.demote', 'staff.staff.manage', 'staff.logs.view'] },
+    { id: 'domain', label: 'Dominio', permissions: ['manage.permissions', 'radio.use', 'tablet.open', 'mdt.open', 'storage.open', 'storage.deposit', 'storage.withdraw', 'storage.manage', 'armory.basic', 'vehicle.basic', 'vehicle.medium', 'vehicle.advanced', 'vehicle.manage', 'patrol.basic', 'patrol.lead', 'reports.approve', 'manage.team', 'boss.actions', 'org.settings', 'highcommand', 'command.full', 'vip.chat.tag', 'vip.kit.bronze', 'vip.kit.silver', 'vip.kit.gold', 'ambulance.radio.use', 'ambulance.tablet.open', 'ambulance.medkit.basic', 'ambulance.revive.basic', 'ambulance.revive.advanced', 'ambulance.vehicle.basic', 'ambulance.manage.team', 'mechanic.tablet.open', 'mechanic.repair.basic', 'mechanic.repair.advanced', 'mechanic.tow.use', 'mechanic.manage.team', 'mechanic.boss.actions'] }
+  ];
+
   var actionLabels = {
     'org.member.set_leader': 'Definir lider',
     'org.member.set_leader.blocked': 'Definir lider bloqueado',
@@ -144,7 +155,11 @@
     'org.recruitment.cancel': 'Arquivar candidatura',
     'org.goal.create': 'Criar meta',
     'org.create': 'Criar organizacao',
-    'org.create.blocked': 'Criacao de org bloqueada'
+    'org.create.blocked': 'Criacao de org bloqueada',
+    'org.grade.permission.add': 'Adicionar permissao ao cargo',
+    'org.grade.permission.add.blocked': 'Adicionar permissao bloqueado',
+    'org.grade.permission.remove': 'Remover permissao do cargo',
+    'org.grade.permission.remove.blocked': 'Remover permissao bloqueado'
   };
 
   function titleCase(value) {
@@ -158,6 +173,16 @@
     if (!capability) return '-';
     if (capabilityLabels[capability]) return capabilityLabels[capability];
     return titleCase(capability.replace(/[._-]+/g, ' '));
+  }
+
+  function getCapabilityCatalog() {
+    return capabilityCatalog.map(function (group) {
+      return {
+        id: group.id,
+        label: group.label,
+        permissions: group.permissions.slice()
+      };
+    });
   }
 
   function formatActionLabel(action) {
@@ -228,6 +253,7 @@
     formatNumber: formatNumber,
     formatOrgType: formatOrgType,
     formatCapabilityLabel: formatCapabilityLabel,
+    getCapabilityCatalog: getCapabilityCatalog,
     formatActionLabel: formatActionLabel,
     formatGradeName: formatGradeName,
     maskCitizenId: maskCitizenId,

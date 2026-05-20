@@ -111,6 +111,9 @@ Todos retornam:
 - `orgs:list`
 - `orgs:get`
 - `orgs:createFromTemplate`
+- `orgs:updateBasic`
+- `orgs:createGrade`
+- `orgs:updateGradeBasic`
 - `members:list`
 - `logs:list`
 - `org-bank:get`
@@ -133,17 +136,17 @@ Todos retornam:
 - `members:demote`
 - `members:setLeader`
 
-### Staff dashboard, criar org e definir lider
+### Staff dashboard, criar org, cargos basicos e definir lider
 
 `/staff` possui um dashboard seguro/read-only com abas internas:
 
 - `Visao geral`: metricas e resumo sem atalhos duplicados.
-- `Organizacoes`: usa `orgs:list`, pode abrir `Ver detalhes` read-only e pode abrir o modal `Criar organizacao` para owner/`staff.orgs.create`.
+- `Organizacoes`: usa `orgs:list`, pode abrir `Ver detalhes`, inclui `Editar dados basicos`, gerenciamento basico de cargos e `Definir lider` dentro do detalhe e pode abrir o modal `Criar organizacao` para owner/`staff.orgs.create`.
 - `Logs`: usa `logs:list`.
 - `Auditoria`: filtra localmente eventos sensiveis dentro dos logs recentes.
-- `Acoes administrativas`: mantem apenas a action real `Definir lider` e mostra cards bloqueados para fases futuras.
+- `Acoes administrativas`: mostra orientacao e cards bloqueados; `Definir lider` foi movido para o detalhe da org.
 
-O dashboard reutiliza services existentes para leitura. A unica nova escrita desta fase e `orgs:createFromTemplate`, restrita a templates server-side. Nao ha CRUD global livre de orgs, gestao de staff, editor de cargos/permissoes, exclusao de org ou acoes financeiras globais.
+O dashboard reutiliza services existentes para leitura. Escritas permitidas nesta fase: `orgs:createFromTemplate`, `orgs:updateBasic`, `orgs:createGrade`, `orgs:updateGradeBasic`, `orgs:addGradePermission`, `orgs:removeGradePermission` e `members:setLeader`. Nao ha CRUD global livre de orgs, gestao de staff, editor livre de permissoes, exclusao de org ou acoes financeiras globais.
 
 #### Criar organizacao por template
 
@@ -179,7 +182,7 @@ Regras:
 
 `staff.orgs.view` agora tambem permite abrir o modulo Staff para consulta. Isso nao concede escrita: criar org exige `staff.orgs.create` e definir lider exige `staff.orgs.set_leader`.
 
-As abas do Staff sao read-only, exceto `Criar organizacao` por template e `Definir lider`. Cards bloqueados nao disparam callback.
+As abas do Staff sao read-only, exceto `Criar organizacao` por template, `Editar dados basicos`, gerenciamento basico de cargos, gerenciamento controlado de permissoes por cargo e `Definir lider` dentro do detalhe da org. Cards bloqueados nao disparam callback.
 
 #### Detalhes da organizacao no Staff
 
@@ -202,9 +205,120 @@ Permissoes de consulta aceitas para essa visao:
 - `staff.orgs.create`;
 - `staff.orgs.set_leader`.
 
-A visao e read-only e mostra resumo, cargos, membros, banco, metas, recrutamento e logs recentes sem expor payload tecnico bruto. CitizenID aparece mascarado em listas.
+A visao mostra resumo, cargos, membros, banco, metas, recrutamento, logs recentes e a aba `Acoes`. As abas de dados sao read-only, sem expor payload tecnico bruto. CitizenID aparece mascarado em listas.
+
+#### Gerenciar cargos basicos
+
+Local da UI:
+
+- `/staff > Organizacoes > Ver detalhes > Cargos`.
+
+Callbacks NUI:
+
+```lua
+orgs:createGrade {
+  orgCode = "ballas",
+  code = "sub_lider",
+  name = "Sub Lider",
+  level = 3,
+  salary = 0,
+  priority = 3,
+  inheritsLevel = 2,
+  reason = "opcional"
+}
+
+orgs:updateGradeBasic {
+  orgCode = "ballas",
+  gradeId = 123,
+  name = "Gerente",
+  level = 3,
+  salary = 0,
+  priority = 3,
+  inheritsLevel = 2,
+  reason = "opcional"
+}
+```
+
+Exports usados:
+
+```lua
+exports['mz_core']:CreateOrgGrade(source, orgCode, payload)
+exports['mz_core']:UpdateOrgGradeBasic(source, orgCode, gradeId, payload)
+```
+
+Regras:
+
+- exige owner ACE `group.mz_owner` ou `staff.orgs.manage`;
+- criar ou mover cargo para acima da top grade atual exige tambem owner ou `staff.orgs.set_leader`;
+- conflitos de `code` e `level` retornam erro e nao reordenam automaticamente;
+- `code` so e enviado na criacao; update nao altera `code`;
+- heranca deve apontar para grade existente da mesma org e nao pode criar ciclo;
+- permissoes/capabilities do cargo podem ser gerenciadas em modal controlado com allowlist oficial e sem campo livre;
+- `mz_org_grades` possui coluna `active`; desativar/reativar cargo e feito sem DELETE fisico;
+- logs: `org.grade.create`, `org.grade.update`, `org.grade.create.blocked`, `org.grade.update.blocked`.
+
+#### Editar dados basicos
+
+Local da UI:
+
+- `/staff > Organizacoes > Ver detalhes > Acoes`.
+
+Callback NUI:
+
+```lua
+orgs:updateBasic {
+  orgCode = "ballas",
+  name = "Ballas",
+  status = "private",
+  hasSalary = false,
+  hasSharedAccount = true,
+  hasStorage = true,
+  reason = "opcional"
+}
+```
+
+Export usado:
+
+```lua
+exports['mz_core']:UpdateOrgBasicInfo(source, orgCode, payload)
+```
+
+Campos permitidos:
+
+- `name`;
+- `status`: `public`, `private` ou `inactive`;
+- `hasSalary`;
+- `hasSharedAccount`;
+- `hasStorage`;
+- `reason` para auditoria.
+
+Campos bloqueados:
+
+- `code`;
+- `type`;
+- cargos/grades;
+- permissoes/capabilities;
+- membros;
+- banco;
+- metas;
+- recrutamento;
+- logs.
+
+Regras:
+
+- exige owner ACE `group.mz_owner` ou capability `staff.orgs.manage`;
+- `staff.panel.open`, `staff.orgs.view`, `staff.orgs.create` e `staff.orgs.set_leader` sozinhos nao autorizam;
+- o server usa `source` real, carrega a org por `orgCode`, sanitiza os campos e filtra apenas colunas permitidas;
+- no banco real, `status` e traduzido para `is_public` e `active`;
+- se `hasSharedAccount` for ligado, o core garante a conta compartilhada pelo servico existente;
+- logs: `org.update_basic` e `org.update_basic.blocked`.
 
 #### Definir lider
+
+Local da UI:
+
+- `/staff > Organizacoes > Ver detalhes > Acoes`.
+- Nao existe mais formulario global com `orgCode` manual em `/staff > Acoes administrativas`.
 
 Callback NUI:
 
@@ -226,7 +340,9 @@ exports['mz_core']:SetOrgLeaderByCitizenId(source, orgCode, targetCitizenId, {
 
 Regras:
 
-- a NUI envia somente `orgCode`, `citizenid` e `reason`;
+- a UI do detalhe pede somente `citizenid` e `reason`;
+- o `orgCode` vem da organizacao selecionada em `staffOrgDetails`, nao de input manual;
+- o service existente continua chamando `members:setLeader` com `orgCode`, `citizenid` e `reason`;
 - o `source` confiavel e o `source` real do evento/server;
 - o core calcula a top grade real como a maior `level` em `mz_org_grades`;
 - se o alvo ja for membro ativo da org, o core atualiza a grade para top grade;
@@ -234,7 +350,7 @@ Regras:
 - funciona com alvo offline se o `citizenid` existir em `mz_players`;
 - exige owner ACE `group.mz_owner` ou `staff.orgs.set_leader`;
 - `staff.panel.open`, `staff.orgs.view` e `staff.orgs.manage` sem `staff.orgs.set_leader` nao autorizam a acao;
-- esta fase mantem apenas essa action real no `/staff`; o restante do dashboard e read-only ou bloqueado para fase futura.
+- o restante do detalhe mantem edicao bloqueada para fase futura.
 
 Erros esperados:
 
@@ -562,7 +678,7 @@ Validacoes server-side:
 
 Nao foram criadas nesta etapa: editar, deletar, concluir, alterar progresso, ranking, recompensa ou pagamento.
 
-### Cargos, grades e capabilities read-only
+### Cargos, grades e capabilities
 
 `org-access:get` recebe:
 
@@ -570,7 +686,7 @@ Nao foram criadas nesta etapa: editar, deletar, concluir, alterar progresso, ran
 { orgCode = "police" }
 ```
 
-O `mz_org` usa o export read-only do `mz_core`:
+O `mz_org` usa o export de modelo de acesso do `mz_core`:
 
 ```lua
 exports['mz_core']:GetOrgAccessModel(source, orgCode)
@@ -615,7 +731,7 @@ Formato seguro esperado:
 
 Origem real no `mz_core`:
 
-- `mz_org_grades`: `level`, `code`, `name`, `salary`, `inherits_grade_id`.
+- `mz_org_grades`: `level`, `code`, `name`, `salary`, `inherits_grade_id`, `active`.
 - `mz_org_permissions`: capabilities base quando `grade_id` e nulo, e capabilities de grade quando `grade_id` aponta para uma grade.
 - `mz_player_permissions`: overrides globais do player atual, retornados sem identifiers privados.
 
@@ -625,7 +741,7 @@ Permissao server-side:
 - staff com `staff.orgs.view` ou `staff.orgs.manage`;
 - membro/lider autorizado por `CanOrg(source, orgCode, 'manage.permissions')`, `CanOrg(source, orgCode, 'manage.members')` ou fallback `CanOrg(source, orgCode, 'org.view')`.
 
-Criar, editar, deletar cargos, alterar capability, escolher grade manualmente fora do fluxo de convite e aplicar overrides continuam pendentes.
+No Staff, cargos podem ser criados/editados/desativados e capabilities diretas podem ser adicionadas/removidas por allowlist oficial. Deletar cargos, campo livre de capability, escolher grade manualmente fora do fluxo de convite e aplicar overrides continuam pendentes.
 
 ### Convidar/adicionar membro
 
@@ -832,6 +948,149 @@ Validacoes server-side:
 - a UI oculta o botao de remover na linha do proprio usuario; se a acao for forcada, o server continua bloqueando e a UI limpa o loading no `finally`.
 
 Nao foram criadas nesta etapa: editar cargo, editar permissao, escolher grade manualmente ou remocao offline.
+
+## Staff: arquivar organizacao e desativar cargo
+
+### `orgs:archive`
+
+Arquiva uma organizacao sem apagar historico, membros, banco, metas, recrutamento ou logs.
+
+Payload:
+
+```lua
+{
+  orgCode = "ballas",
+  reason = "opcional"
+}
+```
+
+Permissao exigida no server: owner ACE `group.mz_owner` ou `staff.orgs.manage`.
+
+### `orgs:reactivate`
+
+Reativa uma organizacao arquivada, preservando `is_public` e demais dados existentes.
+
+Payload:
+
+```lua
+{
+  orgCode = "ballas",
+  reason = "opcional"
+}
+```
+
+### `orgs:disableGrade`
+
+Desativa um cargo da organizacao selecionada sem DELETE fisico.
+
+Payload:
+
+```lua
+{
+  orgCode = "ballas",
+  gradeId = 123,
+  reason = "opcional"
+}
+```
+
+Bloqueios server-side:
+
+- cargo inexistente ou de outra org;
+- cargo com membros ativos (`grade_in_use`);
+- cargo maximo/top grade (`top_grade_protected`);
+- org arquivada (`org_archived`);
+- autor sem owner ou `staff.orgs.manage`.
+
+### `orgs:reactivateGrade`
+
+Reativa um cargo desativado.
+
+Payload:
+
+```lua
+{
+  orgCode = "ballas",
+  gradeId = 123,
+  reason = "opcional"
+}
+```
+
+Exports correspondentes no `mz_core`:
+
+- `ArchiveOrg(source, orgCode, reason)`;
+- `ReactivateOrg(source, orgCode, reason)`;
+- `DisableOrgGrade(source, orgCode, gradeId, reason)`;
+- `ReactivateOrgGrade(source, orgCode, gradeId, reason)`.
+
+Logs gerados:
+
+- `org.archive`;
+- `org.reactivate`;
+- `org.grade.disable`;
+- `org.grade.reactivate`;
+- bloqueios equivalentes com sufixo `.blocked`.
+
+Nenhum payload aceita `source`, ator, permissao, `delete=true`, cargos/permissoes livres ou `orgId` como autoridade.
+
+## Staff: permissoes por cargo
+
+### `orgs:addGradePermission`
+
+Adiciona uma permissao direta a um cargo usando apenas a allowlist oficial.
+
+Payload:
+
+```lua
+{
+  orgCode = "ballas",
+  gradeId = 123,
+  permission = "members.invite",
+  reason = "opcional"
+}
+```
+
+### `orgs:removeGradePermission`
+
+Remove uma permissao direta do cargo de forma segura. A remocao usa `allow = 0` no registro de permissao e nao apaga fisicamente historico ou dados da org.
+
+Payload:
+
+```lua
+{
+  orgCode = "ballas",
+  gradeId = 123,
+  permission = "members.invite",
+  reason = "opcional"
+}
+```
+
+Permissao exigida:
+
+- owner ACE `group.mz_owner`; ou
+- `staff.orgs.manage`.
+
+Regras server-side:
+
+- org deve existir e estar ativa;
+- cargo deve existir, pertencer a org e estar ativo;
+- `permission` precisa existir na allowlist oficial;
+- NUI nao pode enviar lista livre, wildcard, `allowAll`, `source`, ator ou `orgId` como autoridade;
+- `staff.*` e bloqueado em org comum;
+- em org tipo `staff`, `staff.*` exige owner nesta fase;
+- `members.set_leader` exige owner ou `staff.orgs.set_leader`;
+- duplicada retorna `permission_already_exists`;
+- inexistente retorna `permission_not_found`.
+
+Exports correspondentes no `mz_core`:
+
+- `AddOrgGradePermission(source, orgCode, gradeId, permission, reason)`;
+- `RemoveOrgGradePermission(source, orgCode, gradeId, permission, reason)`.
+
+Logs:
+
+- `org.grade.permission.add`;
+- `org.grade.permission.remove`;
+- bloqueios equivalentes com sufixo `.blocked`.
 
 ## Comandos
 

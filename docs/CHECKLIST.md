@@ -72,6 +72,18 @@
 - [x] Fase Staff 1 implementada: dashboard seguro/read-only com abas, orgs, logs, auditoria e acoes bloqueadas.
 - [x] Staff Organizacoes com `Ver detalhes` read-only por orgCode.
 - [x] Detalhe Staff mostra resumo, cargos, membros, banco, metas, recrutamento e logs sem editor.
+- [x] `Definir lider` movido para `/staff > Organizacoes > Ver detalhes > Acoes`.
+- [x] Formulario global de `Definir lider` com orgCode manual removido/compactado.
+- [x] Staff Detalhe permite editar somente dados basicos da org com `staff.orgs.manage`.
+- [x] Export seguro `UpdateOrgBasicInfo` e callback `orgs:updateBasic` para nome/status/flags.
+- [x] Staff Detalhe Cargos permite criar/editar dados basicos de grades com `staff.orgs.manage`.
+- [x] Exports seguros `CreateOrgGrade` e `UpdateOrgGradeBasic` sem editor livre de permissoes.
+- [x] Arquivamento seguro de organizacao implementado sem DELETE fisico.
+- [x] Desativacao/reativacao segura de cargo implementada com coluna `active`.
+- [x] Cargo com membros e cargo maximo protegidos contra desativacao.
+- [x] Editor controlado de permissoes por cargo implementado sem campo livre.
+- [x] Allowlist server-side bloqueia capability fora do catalogo oficial.
+- [x] `staff.*` bloqueado em org comum e `members.set_leader` protegido.
 - [x] Revisao final do MVP: contexto, UX, detalhes tecnicos, empty states, loading e docs.
 
 ## Frontend HTML/CSS/JS modular
@@ -99,6 +111,10 @@
 - [ ] Replicar navegacao interna por abas para VIP, empresa, governo e eventos.
 - [x] Refinar navegacao administrativa do Staff com dashboard seguro/read-only.
 - [ ] Manter painel staff global completo como fase futura.
+- [x] Editor controlado de permissoes por cargo.
+- [ ] Editor livre de permissoes e permissoes globais por player continuam fase futura.
+- [ ] Excluir cargos continua fase futura; desativacao segura ja existe.
+- [ ] Excluir organizacao continua fase futura; arquivamento seguro ja existe.
 - [x] Fase 1 seguranca: detalhes tecnicos brutos ocultos/desativados na UI normal.
 - [ ] Fase futura seguranca: modo owner/debug explicito para detalhes tecnicos completos.
 - [x] Fase 2 seguranca: migrar convite principal de source online para citizenid/passaporte.
@@ -122,11 +138,13 @@
 - [ ] Ranking de metas.
 - [ ] Recompensas de metas.
 - [ ] Logs de metas.
-- [ ] Criar cargo.
-- [ ] Editar cargo.
+- [x] Criar cargo.
+- [x] Editar cargo.
+- [x] Desativar/reativar cargo sem DELETE fisico.
 - [ ] Deletar cargo.
-- [ ] Alterar capability.
-- [ ] Editar org existente.
+- [x] Alterar capability direta de cargo via catalogo oficial.
+- [x] Editar dados basicos de org existente.
+- [x] Arquivar/reativar org sem DELETE fisico.
 - [ ] Excluir org.
 - [ ] Overrides individuais editaveis.
 - [ ] Logs de alteracoes de cargos/permissoes.

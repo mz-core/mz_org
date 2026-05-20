@@ -91,6 +91,10 @@
     memberModal: { open: false, citizenid: '', gradeLevel: '', gradeCode: '', loading: false, error: null },
     staffLeader: { orgCode: '', citizenid: '', reason: '', loading: false, message: null, error: null },
     staffCreateOrg: { open: false, type: 'gang', code: '', name: '', hasSalary: false, hasSharedAccount: true, hasStorage: true, reason: '', loading: false, message: null, error: null },
+    staffEditOrgBasic: { open: false, orgCode: null, name: '', status: 'private', hasSalary: false, hasSharedAccount: false, hasStorage: false, reason: '', loading: false, message: null, error: null },
+    staffGradeModal: { open: false, mode: 'create', gradeId: null, code: '', name: '', level: '', salary: 0, priority: '', inheritsLevel: '', reason: '', loading: false, message: null, error: null },
+    staffArchiveModal: { open: false, action: null, orgCode: null, gradeId: null, title: '', description: '', reason: '', loading: false, error: null },
+    staffPermissionModal: { open: false, gradeId: null, selectedPermission: '', search: '', reason: '', loading: false, error: null, message: null },
     staffOrgDetails: { open: false, orgCode: null, activeTab: 'summary', loading: false, error: null, data: null },
     cache: { orgs: null, logs: null, bank: {}, accessByOrg: {} },
     sidebarCollapsed: false

@@ -21,9 +21,9 @@ Caracteristicas:
 - logs: `org.create` e `org.create.blocked`;
 - os atalhos seguros duplicados da visao geral foram compactados; a navegacao principal agora fica nas abas internas.
 
-Continuam bloqueados: editor livre de cargos/permissoes, editar org existente, excluir org, gestao global de staff e painel staff global completo.
+Continuam bloqueados: editor livre de cargos/permissoes, edicao avancada de org, excluir org, gestao global de staff e painel staff global completo.
 
-## Atualizacao - Detalhes read-only de organizacao
+## Atualizacao - Detalhes de organizacao e acoes limitadas
 
 `/staff > Organizacoes` agora possui `Ver detalhes` no lugar do placeholder `Detalhe futuro`.
 
@@ -35,16 +35,20 @@ A subview mostra, sempre em modo consulta:
 - banco resumido e ultimos movimentos;
 - metas recentes;
 - recrutamento recente;
-- logs recentes da org.
+- logs recentes da org;
+- aba `Acoes`, com `Definir lider` quando houver owner/`staff.orgs.set_leader` e cards futuros bloqueados.
 
 Implementacao:
 
 - nao foi criado callback agregado novo;
 - a UI reaproveita callbacks/services existentes por `orgCode`;
 - o detalhe usa estado proprio `staffOrgDetails` e nao muda `activeOrgCode` dos shells `/org` ou `/gang`;
+- `Definir lider` usa `staffOrgDetails.orgCode`, sem campo manual de `orgCode`;
+- `Editar dados basicos` permite alterar somente nome, status publico/privado/inativo e flags operacionais com `staff.orgs.manage`;
+- a aba global `Acoes administrativas` foi compactada para orientar o uso de `Organizacoes > Ver detalhes > Acoes`;
 - `staff.orgs.view` agora tambem libera abertura do modulo Staff para consulta, mantendo acoes de escrita separadas por capabilities fortes.
 
-Continuam inexistentes nesta tela: editar org, editar cargo/permissao, excluir org, adicionar/remover membro global, operar banco e aprovar/recusar recrutamento pelo Staff.
+Continuam inexistentes nesta tela: editar codigo/tipo da org, editar cargo/permissao, excluir org, adicionar/remover membro global, operar banco e aprovar/recusar recrutamento pelo Staff.
 
 ## Como o `/staff` abre hoje
 
@@ -131,20 +135,18 @@ O painel fica registrado em `mz_org/web/panels/staff/index.js`:
 
 - heading `Staff / Area administrativa`;
 - badge de acesso (`OWNER`, `STAFF`, etc.);
-- tres cards de metricas:
-  - acesso liberado;
-  - auditoria disponivel ou oculta;
-  - acoes sensiveis protegidas;
-- card `Visao administrativa` com atalhos para:
-  - `Organizacoes`;
-  - `Logs`;
-- card `Definir lider de organizacao`, quando autorizado;
-- card bloqueado `Definir lider`, quando sem permissao forte.
+- cards superiores de metricas administrativas;
+- abas internas `Visao geral`, `Organizacoes`, `Logs`, `Auditoria` e `Acoes administrativas`;
+- lista de organizacoes com `Criar organizacao` por template quando houver owner/`staff.orgs.create`;
+- subview `Organizacoes > Ver detalhes` com abas de consulta e aba `Acoes`;
+- aba `Acoes` dentro do detalhe da org, onde fica `Definir lider` quando houver owner/`staff.orgs.set_leader`;
+- aba global `Acoes administrativas` compactada, sem formulario global de lideranca.
 
-O visual do card de lider usa classes CSS proprias:
+O visual da acao de lideranca no detalhe usa classes CSS proprias:
 
 - `.staff-leader-card`;
-- `.staff-leader-form`;
+- `.staff-set-leader-form`;
+- `.staff-set-leader-hint`;
 - `.staff-leader-wide`;
 - `.staff-leader-actions`.
 
@@ -159,7 +161,11 @@ Leitura:
 
 Escrita:
 
-- `members:setLeader`: unica action administrativa especifica do `/staff` hoje.
+- `orgs:createFromTemplate`: cria org/faccao por template seguro.
+- `orgs:updateBasic`: altera somente nome, status e flags basicas da org selecionada.
+- `orgs:createGrade`: cria grade/cargo basico na org selecionada.
+- `orgs:updateGradeBasic`: edita nome, level, salario, prioridade e heranca de grade.
+- `members:setLeader`: define lider/top grade na org selecionada pelo detalhe Staff.
 
 Callbacks gerais existentes tambem podem ser usados em outros shells:
 
@@ -169,42 +175,48 @@ Callbacks gerais existentes tambem podem ser usados em outros shells:
 - metas: listar, obter e criar;
 - cargos/acesso: `org-access:get`.
 
-Ponto importante: esses callbacks existem no resource, mas o `/staff` atual nao oferece um CRUD global completo por UI. A acao de escrita explicitamente exposta no Staff e apenas `members:setLeader`.
+Ponto importante: esses callbacks existem no resource, mas o `/staff` atual nao oferece um CRUD global completo por UI. As escritas expostas sao limitadas: criar organizacao por template, editar dados basicos, gerenciar dados basicos de cargos e definir lider dentro do detalhe da org selecionada.
 
 ## Acoes existentes no `/staff`
 
 Leitura:
 
 - navegar para `Organizacoes` e carregar `orgs:list`;
+- abrir `Ver detalhes` de uma org e consultar dados por `orgCode`;
 - navegar para `Logs` e carregar `logs:list`;
 - visualizar o card de estado administrativo.
 
 Escrita:
 
-- definir lider/top grade de uma org/gang por `orgCode` e `citizenid`.
+- criar organizacao por template server-side;
+- editar dados basicos da org selecionada;
+- criar/editar dados basicos de cargos da org selecionada;
+- definir lider/top grade da org selecionada no detalhe usando `citizenid`.
 
 Bloqueado/futuro:
 
-- criar/editar/deletar orgs;
-- editar cargos/capabilities;
+- editar codigo/tipo ou deletar orgs;
+- editar capabilities/permissoes de cargos;
+- excluir/desativar cargos sem suporte seguro no schema;
 - adicionar/remover/promover/rebaixar membros globalmente por painel staff;
 - mexer em banco de qualquer org pelo Staff;
 - gerenciar staff/hierarquia staff;
 - painel global de recrutamento.
 
-## Avaliacao do card "Definir lider"
+## Avaliacao da acao "Definir lider"
 
-Estado atual: seguro para a fase minima proposta.
+Estado atual: seguro para a fase minima proposta e melhor integrado ao detalhe da organizacao.
 
 Frontend:
 
-- O card aparece somente para owner ou para quem tem `staff.orgs.set_leader` em `globalPermissions`.
-- Se nao tiver essa permissao, aparece um card bloqueado.
+- A acao aparece em `/staff > Organizacoes > Ver detalhes > Acoes`.
+- O card funcional aparece somente para owner ou para quem tem `staff.orgs.set_leader` em `globalPermissions`.
+- Se nao tiver essa permissao, aparece um card bloqueado/read-only dentro do detalhe.
+- Nao ha mais campo manual de `orgCode`; o codigo vem de `staffOrgDetails.orgCode`, isto e, da org selecionada.
 - O formulario envia apenas:
-  - `orgCode`;
   - `citizenid`;
   - `reason`.
-- `member-service.js` chama `members:setLeader` com somente esses campos.
+- `member-service.js` chama `members:setLeader` com `orgCode` selecionado internamente, `citizenid` e `reason`.
 - Nao envia `source`, `actorCitizenId`, cargo, permissao, `gradeLevel` ou `gradeId`.
 
 Server `mz_org`:
@@ -241,13 +253,13 @@ Restricoes confirmadas:
 
 O `/staff` nao usa `activeOrgCode` de `/org` ou `/gang`; ao abrir, zera `activeOrgCode` e usa shell administrativo.
 
-Os atalhos de `Organizacoes` e `Logs` sao consultas administrativas/permitidas pela sessao, nao a org pessoal ativa. A tela deixa claro que e `Area administrativa`, mas ainda pode melhorar visualmente com:
+As abas de `Organizacoes` e `Logs` sao consultas administrativas/permitidas pela sessao, nao a org pessoal ativa. A tela deixa claro que e `Area administrativa`, mas ainda pode melhorar visualmente com:
 
 - label persistente `Modo administrativo`;
 - destaque maior para a diferenca entre "minhas orgs" e "consulta staff";
 - filtros claros em logs globais.
 
-Risco baixo atual: o card "Definir lider" usa input manual de `orgCode`, entao nao depende de uma org pessoal ativa por engano.
+Risco baixo atual: `Definir lider` usa a org selecionada no detalhe Staff, sem depender de org pessoal ativa nem de input manual de `orgCode`.
 
 ## Dashboard Staff atual
 
@@ -260,8 +272,12 @@ O Staff agora possui:
 - consulta de orgs via `orgs:list`;
 - consulta de logs via `logs:list`;
 - auditoria sensivel filtrada localmente dos logs recentes;
+- criacao de org por template na aba `Organizacoes`;
+- detalhes por org com abas de consulta e aba `Acoes`;
+- edicao limitada de dados basicos por org com `staff.orgs.manage`;
+- criacao/edicao limitada de cargos basicos com `staff.orgs.manage`;
 - cards bloqueados para acoes futuras;
-- `Definir lider` como unica action real de escrita.
+- `Definir lider` movido para `Organizacoes > Ver detalhes > Acoes`.
 - cards bloqueados sem handler de acao real.
 - confirmacoes de acoes de membros fora do Staff feitas inline, sem janela externa do navegador.
 
@@ -352,24 +368,30 @@ Organizacoes:
 - lista de orgs/gangs
 - filtros por tipo
 - botao "ver detalhes"
+- detalhe com abas de consulta e Acoes limitadas
 
 Logs:
 - logs recentes
 - filtros por org, categoria e severidade
 
 Acoes administrativas:
-- Definir lider
+- orientacao para usar Organizacoes > Ver detalhes > Acoes
 - outras acoes futuras bloqueadas
+
+Dentro do detalhe da organizacao:
+- Definir lider
+- acoes futuras bloqueadas por org
 ```
 
 ## Dependencias para a proxima implementacao
 
-Da para evoluir a Fase Staff 1 majoritariamente no frontend:
+Da para evoluir as proximas fases majoritariamente reaproveitando os dados atuais, mas qualquer escrita nova deve ter permissao forte e validacao server-side:
 
 - `orgs:list` ja fornece lista de orgs visiveis;
+- `orgs:get` e `org-access:get` ja sustentam a consulta do detalhe;
 - `logs:list` ja fornece auditoria permitida;
 - `session:get` ja traz owner/permissoes/modulos;
-- `members:setLeader` ja existe para a action minima.
+- `members:setLeader` ja existe para a acao de lideranca dentro do detalhe.
 
 Pode precisar de callback novo apenas se quiser numeros agregados precisos, como membros totais por todas as orgs sem carregar org por org.
 
@@ -396,3 +418,30 @@ Nao implementar ainda:
 - gestao de staff;
 - banco administrativo global;
 - recrutamento global.
+
+## Atualizacao: arquivamento seguro
+
+O detalhe Staff da organizacao agora permite operacoes de ciclo de vida sem exclusao fisica:
+
+- `/staff > Organizacoes > Ver detalhes > Acoes` mostra `Arquivar organizacao` quando ativa e `Reativar organizacao` quando inativa.
+- Arquivar apenas altera `active = 0`; reativar volta para `active = 1`.
+- Historico, membros, banco, metas, recrutamento e logs permanecem intactos.
+- `/staff > Organizacoes > Ver detalhes > Cargos` mostra cargos ativos e desativados.
+- Cargo ativo sem membros e que nao seja top grade pode ser desativado.
+- Cargo desativado pode ser reativado.
+- Cargo com membros e top grade continuam bloqueados.
+- Permissao exigida: owner ACE ou `staff.orgs.manage`.
+- Nao foi criado editor livre de permissoes nem exclusao permanente.
+
+## Atualizacao: permissoes por cargo
+
+O detalhe Staff agora permite gerenciar permissoes diretas de cargos de forma controlada:
+
+- Entrada: `/staff > Organizacoes > Ver detalhes > Cargos > Gerenciar permissoes`.
+- A tabela continua compacta; permissoes seguem visiveis em resumo.
+- O modal mostra permissoes diretas removiveis e permissoes herdadas/base apenas como consulta.
+- Adicao usa catalogo oficial agrupado, sem campo livre.
+- Staff comum nao consegue inserir `staff.*` em org comum.
+- `members.set_leader` continua protegido por owner ou `staff.orgs.set_leader`.
+- Org arquivada e cargo inativo bloqueiam edicao.
+- Nao ha gestao staff global, ACE, permissao por player ou editor livre.

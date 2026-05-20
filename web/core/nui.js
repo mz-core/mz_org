@@ -131,6 +131,15 @@
     if (eventName === 'orgs:list') return Promise.resolve({ ok: true, data: [] });
     if (eventName === 'orgs:get') return Promise.resolve({ ok: true, data: {} });
     if (eventName === 'orgs:createFromTemplate') return Promise.resolve({ ok: true, data: { org: { code: payload.code, name: payload.name, type: payload.type }, template: payload.type } });
+    if (eventName === 'orgs:updateBasic') return Promise.resolve({ ok: true, data: { org: { code: payload.orgCode, name: payload.name, status: payload.status, active: payload.status !== 'inactive', is_public: payload.status === 'public', hasSalary: payload.hasSalary, hasSharedAccount: payload.hasSharedAccount, hasStorage: payload.hasStorage } } });
+    if (eventName === 'orgs:createGrade') return Promise.resolve({ ok: true, data: { grade: { code: payload.code, name: payload.name, level: payload.level, salary: payload.salary, priority: payload.priority, inheritsLevel: payload.inheritsLevel, active: true } } });
+    if (eventName === 'orgs:updateGradeBasic') return Promise.resolve({ ok: true, data: { grade: { id: payload.gradeId, name: payload.name, level: payload.level, salary: payload.salary, priority: payload.priority, inheritsLevel: payload.inheritsLevel, active: true } } });
+    if (eventName === 'orgs:archive') return Promise.resolve({ ok: true, data: { org: { code: payload.orgCode, active: false, status: 'inactive' } } });
+    if (eventName === 'orgs:reactivate') return Promise.resolve({ ok: true, data: { org: { code: payload.orgCode, active: true, status: 'private' } } });
+    if (eventName === 'orgs:disableGrade') return Promise.resolve({ ok: true, data: { grade: { id: payload.gradeId, active: false } } });
+    if (eventName === 'orgs:reactivateGrade') return Promise.resolve({ ok: true, data: { grade: { id: payload.gradeId, active: true } } });
+    if (eventName === 'orgs:addGradePermission') return Promise.resolve({ ok: true, data: { gradeId: payload.gradeId, permission: payload.permission } });
+    if (eventName === 'orgs:removeGradePermission') return Promise.resolve({ ok: true, data: { gradeId: payload.gradeId, permission: payload.permission } });
     if (eventName === 'members:list') return Promise.resolve({ ok: true, data: [] });
     if (eventName === 'members:invite') return Promise.resolve({ ok: true, data: { orgCode: payload.orgCode, targetCitizenId: payload.citizenid, grade: payload.gradeLevel || 1, gradeCode: payload.gradeCode || 'recruta' } });
     if (eventName === 'members:remove') return Promise.resolve({ ok: true, data: { orgCode: payload.orgCode, targetCitizenId: payload.citizenid, removed: true } });
@@ -154,9 +163,9 @@
     if (eventName === 'goals:get') return Promise.resolve({ ok: true, data: {} });
     if (eventName === 'goals:create') return Promise.resolve({ ok: true, data: { id: Date.now(), orgCode: payload.orgCode, title: payload.title, type: payload.type || 'manual', status: 'active', target: payload.target || 1, progress: 0, progressPercent: 0 } });
     if (eventName === 'org-access:get') return Promise.resolve({ ok: true, data: { orgCode: 'police', orgName: 'Policia', type: 'legal', baseCapabilities: ['org.view'], grades: [
-      { level: 1, code: 'recruta', name: 'Recruta', salary: 0, capabilities: ['org.view'] },
-      { level: 2, code: 'membro', name: 'Membro', salary: 0, capabilities: ['org.view', 'members.invite'] },
-      { level: 3, code: 'lider', name: 'Lider', salary: 0, capabilities: ['org.view', 'members.invite', 'manage.members'] }
+      { id: 1, level: 1, code: 'recruta', name: 'Recruta', salary: 0, priority: 1, active: true, capabilities: ['org.view'], directCapabilities: ['org.view'] },
+      { id: 2, level: 2, code: 'membro', name: 'Membro', salary: 0, priority: 2, active: true, capabilities: ['org.view', 'members.invite'], directCapabilities: ['members.invite'] },
+      { id: 3, level: 3, code: 'lider', name: 'Lider', salary: 0, priority: 3, active: true, capabilities: ['org.view', 'members.invite', 'manage.members'], directCapabilities: ['manage.members'] }
     ], playerOverrides: [] } });
     return Promise.resolve({ ok: true });
   }
