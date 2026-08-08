@@ -90,7 +90,7 @@ local function isAceAllowed(src, ace)
 end
 
 local function isOwner(src)
-  return isAceAllowed(src, Config.OwnerAce)
+  return MZOrgSecurity.IsOwner(src)
 end
 
 local function canViewRecruitment(src, orgCode)
@@ -100,50 +100,34 @@ local function canViewRecruitment(src, orgCode)
     return false
   end
 
-  if safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.view') == true then
+  if MZOrgSecurity.CanOrg(src, orgCode, 'recruitment.view') then
     return true
   end
 
-  if safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.manage') == true then
+  if MZOrgSecurity.CanOrg(src, orgCode, 'recruitment.manage') then
     return true
   end
 
-  if safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.create') == true then
+  if MZOrgSecurity.CanOrg(src, orgCode, 'members.invite') then
     return true
   end
 
-  if safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.set_leader') == true then
-    return true
-  end
-
-  if safeExport('mz_core', 'CanOrg', src, orgCode, 'recruitment.view') == true then
-    return true
-  end
-
-  if safeExport('mz_core', 'CanOrg', src, orgCode, 'recruitment.manage') == true then
-    return true
-  end
-
-  if safeExport('mz_core', 'CanOrg', src, orgCode, 'members.invite') == true then
-    return true
-  end
-
-  return safeExport('mz_core', 'CanOrg', src, orgCode, 'manage.members') == true
+  return MZOrgSecurity.CanOrg(src, orgCode, 'manage.members')
 end
 
 local function canManageRecruitment(src, orgCode)
   if isOwner(src) then return true end
   if not orgCode then return false end
 
-  if safeExport('mz_core', 'CanOrg', src, orgCode, 'recruitment.manage') == true then
+  if MZOrgSecurity.CanOrg(src, orgCode, 'recruitment.manage') then
     return true
   end
 
-  if safeExport('mz_core', 'CanOrg', src, orgCode, 'members.invite') == true then
+  if MZOrgSecurity.CanOrg(src, orgCode, 'members.invite') then
     return true
   end
 
-  return safeExport('mz_core', 'CanOrg', src, orgCode, 'manage.members') == true
+  return MZOrgSecurity.CanOrg(src, orgCode, 'manage.members')
 end
 
 local function normalizeFilters(payload)

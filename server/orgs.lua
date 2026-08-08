@@ -190,6 +190,7 @@ local function normalizePermission(value)
   value = tostring(value):gsub('^%s+', ''):gsub('%s+$', ''):lower()
   if value == '' or #value > 128 then return nil end
   if not value:match('^[a-z0-9_.-]+$') then return nil end
+  if value:match('^staff%.') then return nil end
   return value
 end
 
@@ -247,26 +248,26 @@ local function normalizeOrg(row, playerContext)
 end
 
 local function isOwner(src)
-  return isAceAllowed(src, Config.OwnerAce)
+  return MZOrgSecurity.IsOwner(src)
 end
 
 local function canManageOrgs(src)
   if isOwner(src) then return true end
 
-  return safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.view') == true
-    or safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.manage') == true
-    or safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.create') == true
-    or safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.set_leader') == true
+  return MZOrgSecurity.HasGlobalPermission(src, 'staff.orgs.view')
+    or MZOrgSecurity.HasGlobalPermission(src, 'staff.orgs.manage')
+    or MZOrgSecurity.HasGlobalPermission(src, 'staff.orgs.create')
+    or MZOrgSecurity.HasGlobalPermission(src, 'staff.orgs.set_leader')
 end
 
 local function canCreateOrgs(src)
   if isOwner(src) then return true end
-  return safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.create') == true
+  return MZOrgSecurity.HasGlobalPermission(src, 'staff.orgs.create')
 end
 
 local function canUpdateOrgBasic(src)
   if isOwner(src) then return true end
-  return safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.manage') == true
+  return MZOrgSecurity.HasGlobalPermission(src, 'staff.orgs.manage')
 end
 
 local function getPlayerContext(src)
@@ -304,7 +305,7 @@ end
 
 local function canViewOrg(src, orgCode)
   if isOwner(src) or canManageOrgs(src) then return true end
-  return safeExport('mz_core', 'CanOrg', src, orgCode, 'org.view') == true
+  return MZOrgSecurity.CanOrg(src, orgCode, 'org.view')
 end
 
 RegisterNetEvent('mz_org:server:listOrgs', function(requestId)
@@ -511,6 +512,9 @@ local function gradePermissionErrorMessage(errorCode)
   if errorCode == 'permission_not_allowed_for_org_type' then message = 'Esta permissao nao e permitida para este tipo de organizacao.' end
   if errorCode == 'sensitive_permission_requires_owner' then message = 'Esta permissao sensivel exige owner.' end
   if errorCode == 'leader_permission_required' then message = 'Definir lideranca exige permissao forte.' end
+  if errorCode == 'leadership_not_supported' then
+    message = 'Este tipo de organizacao nao possui lideranca.'
+  end
   if errorCode == 'permission_already_exists' then message = 'Este cargo ja possui essa permissao.' end
   if errorCode == 'permission_not_found' then message = 'Permissao nao encontrada neste cargo.' end
   if errorCode == 'forbidden' then message = 'Voce nao tem permissao para gerenciar permissoes.' end

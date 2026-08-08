@@ -8,6 +8,15 @@
     var permissions = window.MZOrgPermissions;
 
     return {
+      version: session.version || session.contractVersion || 1,
+      revision: session.revision || session.sessionId || '',
+      entryAllowed: session.entryAllowed !== false,
+      denialReason: session.denialReason || null,
+      defaultContextId: session.defaultContextId || null,
+      requestedEntry: session.requestedEntry || null,
+      global: session.global || { permissions: [], permissionGrants: [], features: [] },
+      organizations: Array.isArray(session.organizations) ? session.organizations : [],
+      staff: session.staff || session.staffContext || null,
       user: {
         source: user.source || 0,
         name: user.name || 'Player',
@@ -26,7 +35,9 @@
           capabilities: Array.isArray(org.capabilities) ? org.capabilities : []
         };
       }).filter(function (org) { return org.code; }) : [],
-      modules: Array.isArray(session.modules) ? session.modules : []
+      modules: Array.isArray(session.modules)
+        ? session.modules
+        : (session.compatibility && Array.isArray(session.compatibility.modules) ? session.compatibility.modules : [])
     };
   }
 

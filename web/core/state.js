@@ -101,6 +101,10 @@
   };
 
   function resetOrgPanelData() {
+    state.orgView.detailLoading = false;
+    state.orgView.membersLoading = false;
+    state.orgView.bankLoading = false;
+    state.orgView.transactionsLoading = false;
     state.orgView.detail = null;
     state.orgView.members = [];
     state.orgView.bank = null;

@@ -112,40 +112,27 @@ local function isAceAllowed(src, ace)
 end
 
 local function isOwner(src)
-  return isAceAllowed(src, Config.OwnerAce)
+  return MZOrgSecurity.IsOwner(src)
 end
 
 local function canViewMembers(src, orgCode)
   if isOwner(src) then return true end
 
-  if safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.view') == true then
-    return true
+  for _, permission in ipairs({
+    'staff.members.invite', 'staff.members.remove',
+    'staff.members.promote', 'staff.members.demote'
+  }) do
+    if MZOrgSecurity.HasGlobalPermission(src, permission) then return true end
   end
 
-  if safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.manage') == true then
-    return true
-  end
-
-  if safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.create') == true then
-    return true
-  end
-
-  if safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.set_leader') == true then
-    return true
-  end
-
-  return safeExport('mz_core', 'CanOrg', src, orgCode, 'org.view') == true
+  return MZOrgSecurity.CanOrg(src, orgCode, 'members.view')
+    or MZOrgSecurity.CanOrg(src, orgCode, 'org.view')
 end
 
 local function canSetLeader(src, orgCode)
   if isOwner(src) then return true end
   if not orgCode then return false end
-
-  if safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.set_leader') == true then
-    return true
-  end
-
-  return safeExport('mz_core', 'CanOrg', src, orgCode, 'staff.orgs.set_leader') == true
+  return MZOrgSecurity.HasGlobalPermission(src, 'staff.orgs.set_leader')
 end
 
 local function normalizeMember(row)
@@ -175,6 +162,12 @@ RegisterNetEvent('mz_org:server:listMembers', function(requestId, payload)
     return
   end
 
+  local active, activeError = MZOrgSecurity.RequireActiveOrg(orgCode)
+  if not active then
+    sendResponse(src, requestId, fail(activeError == 'org_archived' and 'Organizacao arquivada.' or 'Organizacao indisponivel.'))
+    return
+  end
+
   if not canViewMembers(src, orgCode) then
     sendResponse(src, requestId, fail('Sem permissao.'))
     return
@@ -187,8 +180,8 @@ RegisterNetEvent('mz_org:server:listMembers', function(requestId, payload)
   end
 
   if type(rows) ~= 'table' then
-    debugPrint('ListOrgMembers indisponivel ou falhou no mz_core; retornando lista vazia segura.')
-    sendResponse(src, requestId, ok({}))
+    debugPrint('ListOrgMembers indisponivel ou falhou no mz_core; leitura negada.')
+    sendResponse(src, requestId, fail('Nao foi possivel listar membros.'))
     return
   end
 
@@ -242,7 +235,7 @@ RegisterNetEvent('mz_org:server:inviteMember', function(requestId, payload)
   local result, dataOrErr = nil, nil
   if citizenid then
     result, dataOrErr = safeExport('mz_core', 'InviteOrgMemberByCitizenId', src, orgCode, citizenid, options)
-  elseif Config and Config.Debug then
+  elseif Config and Config.AllowLegacyTargetSourceInvite == true then
     result, dataOrErr = safeExport('mz_core', 'InviteOrgMember', src, orgCode, targetId, options)
   else
     sendResponse(src, requestId, fail('CitizenID do player alvo invalido.'))
@@ -309,6 +302,14 @@ end)
 local function memberGradeAction(src, requestId, payload, action)
   local orgCode = normalizeOrgCode(type(payload) == 'table' and payload.orgCode or nil)
   local citizenid = normalizeCitizenId(type(payload) == 'table' and payload.citizenid or nil)
+  local reason = type(payload) == 'table' and payload.reason or nil
+  if type(reason) == 'string' or type(reason) == 'number' then
+    reason = tostring(reason):gsub('^%s+', ''):gsub('%s+$', '')
+    if reason == '' then reason = nil end
+    if reason and #reason > 255 then reason = reason:sub(1, 255) end
+  else
+    reason = nil
+  end
 
   if not orgCode then
     sendResponse(src, requestId, fail('Organizacao invalida.'))
@@ -326,7 +327,9 @@ local function memberGradeAction(src, requestId, payload, action)
   end
 
   local exportName = action == 'demote' and 'DemoteOrgMemberSecure' or 'PromoteOrgMemberSecure'
-  local result, dataOrErr = safeExport('mz_core', exportName, src, orgCode, citizenid)
+  local result, dataOrErr = safeExport('mz_core', exportName, src, orgCode, citizenid, {
+    reason = reason
+  })
   if result ~= true then
     local message = action == 'demote' and 'Nao foi possivel rebaixar o membro.' or 'Nao foi possivel promover o membro.'
     if dataOrErr == 'invalid_target' then message = 'Membro alvo invalido.' end
@@ -341,11 +344,30 @@ local function memberGradeAction(src, requestId, payload, action)
     if dataOrErr == 'min_grade' or dataOrErr == 'min_grade_reached' then message = 'O membro ja esta no cargo minimo.' end
     if dataOrErr == 'protected_target' then message = 'Este membro esta em cargo protegido.' end
     if dataOrErr == 'grade_not_found' then message = 'Cargo da organizacao nao encontrado.' end
+    if dataOrErr == 'audit_transaction_failed' then message = 'A alteracao foi cancelada porque a auditoria nao foi confirmada.' end
     sendResponse(src, requestId, fail(message))
     return
   end
 
-  sendResponse(src, requestId, ok(dataOrErr or {}))
+  if type(dataOrErr) ~= 'table'
+    or not dataOrErr.auditId
+    or dataOrErr.orgCode ~= orgCode
+    or dataOrErr.targetCitizenId ~= citizenid
+    or dataOrErr.action ~= action
+    or tonumber(dataOrErr.oldGrade) == nil
+    or tonumber(dataOrErr.newGrade) == nil
+    or type(dataOrErr.oldGradeCode) ~= 'string'
+    or dataOrErr.oldGradeCode == ''
+    or type(dataOrErr.newGradeCode) ~= 'string'
+    or dataOrErr.newGradeCode == '' then
+    debugPrint(('invalid audited grade response from mz_core action=%s org=%s target=%s'):format(
+      tostring(action), tostring(orgCode), tostring(citizenid)
+    ))
+    sendResponse(src, requestId, fail('A alteracao nao foi confirmada com auditoria valida.'))
+    return
+  end
+
+  sendResponse(src, requestId, ok(dataOrErr))
 end
 
 RegisterNetEvent('mz_org:server:promoteMember', function(requestId, payload)
@@ -400,6 +422,9 @@ RegisterNetEvent('mz_org:server:setOrgLeader', function(requestId, payload)
     if dataOrErr == 'invalid_target' then message = 'Informe um CitizenID valido.' end
     if dataOrErr == 'target_not_found' then message = 'Player nao encontrado.' end
     if dataOrErr == 'forbidden' then message = 'Voce nao tem permissao para definir lideranca.' end
+    if dataOrErr == 'leadership_not_supported' then
+      message = 'Este tipo de organizacao nao possui lideranca.'
+    end
     if dataOrErr == 'top_grade_not_found' then message = 'Cargo maximo da organizacao nao encontrado.' end
     if dataOrErr == 'set_leader_failed' then message = 'Nao foi possivel definir o lider.' end
     if dataOrErr == 'rate_limited' then message = 'Aguarde alguns segundos e tente novamente.' end

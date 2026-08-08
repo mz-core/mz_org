@@ -94,13 +94,13 @@ A sessao e montada em `mz_org/server/session.lua`.
 
 Owner:
 
-- `group.mz_owner` recebe `staff.orgs.view`, `staff.orgs.manage`, `staff.orgs.set_leader`, `staff.staff.manage`, `staff.members.*`, `staff.players.manage` e `staff.logs.view`.
+- `group.mz_owner` é resolvido como autoridade máxima independentemente dos cargos persistidos.
 - Owner sempre recebe modulo `staff`.
 
 Nao-owner:
 
-- `buildGlobalPermissions()` coleta permissoes por ACE direta ou por `mz_core:HasGlobalPermission`.
-- Se o player tiver org do tipo `staff`, a sessao tambem adiciona `staff.panel.open`.
+- `buildGlobalPermissions()` coleta permissoes globais efetivas por `mz_core:HasGlobalPermission`, incluindo ACE, override e cargo Staff persistente.
+- Membership em organização do tipo `staff` não concede nenhuma permissão `staff.*`.
 - `buildModules()` libera o modulo `staff` se houver:
   - `staff.panel.open`;
   - `staff.orgs.manage`;
@@ -113,12 +113,14 @@ Nuance encontrada:
 - `staff.orgs.view` aparece em `globalPermissions`, permite consulta administrativa em callbacks como `orgs:list` e agora tambem entra na condicao de abertura do modulo Staff.
 - Isso continua seguro porque `staff.orgs.view` nao autoriza escritas como criar org, definir lider, editar cargos/permissoes ou operar banco.
 
-Seed atual da org staff no `mz_core/server/seed/default_orgs.lua`:
+Base Staff atual no `mz_core/server/seed/default_staff.lua`:
 
-- base: `staff.panel.open`;
-- Helper: `staff.orgs.view`, `staff.report.view`;
-- Moderador: `staff.kick`, `staff.spectate`;
-- Admin: `staff.logs.view`, `staff.orgs.manage`, `staff.orgs.set_leader`, alem de outras permissoes staff.
+- Suporte nível 100;
+- Moderador nível 300;
+- Administrador nível 700;
+- Gerente Staff nível 900;
+- Staff Supremo somente pelo ACE `group.mz_owner`, fora do banco;
+- nenhum player recebe atribuição automática.
 
 ## O que o painel Staff mostra hoje
 
@@ -343,7 +345,7 @@ Status: implementada no frontend.
 - Criar hierarquia staff explicita.
 - Staff so mexe abaixo do proprio nivel.
 - Owner ACE acima de tudo.
-- Permissoes dedicadas: `staff.staff.manage` e/ou `staff.members.*`.
+- Permissoes dedicadas: `staff.roles.manage` e/ou `staff.members.*`.
 
 ## Layout futuro recomendado
 

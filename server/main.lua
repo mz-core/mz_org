@@ -81,11 +81,28 @@ RegisterCommand('mzorg_test', function(source, args)
   local okContext, context = callCoreExport('GetPlayerOrgContext', src)
   printExportResult('GetPlayerOrgContext', okContext, context)
 
-  local okCanView, canView = callCoreExport('CanOrg', src, orgCode, 'org.view')
-  printExportResult(('CanOrg(%s, org.view)'):format(orgCode), okCanView, canView)
+  local okOrg, organization = callCoreExport('GetOrgByCode', orgCode)
+  printExportResult(('GetOrgByCode(%s)'):format(orgCode), okOrg, organization)
 
-  local okCanInvite, canInvite = callCoreExport('CanOrg', src, orgCode, 'members.invite')
-  printExportResult(('CanOrg(%s, members.invite)'):format(orgCode), okCanInvite, canInvite)
+  local capabilities = {
+    'org.view',
+    'members.view',
+    'members.invite',
+    'members.remove',
+    'members.promote',
+    'members.demote',
+    'manage.members',
+    'members.set_leader',
+    'vip.chat.tag'
+  }
+  for _, capability in ipairs(capabilities) do
+    local okCapability, allowed = callCoreExport('CanOrg', src, orgCode, capability)
+    printExportResult(
+      ('CanOrg(%s, %s)'):format(orgCode, capability),
+      okCapability,
+      allowed
+    )
+  end
 
   local okMembers, members, membersErr = callCoreExport('ListOrgMembers', src, orgCode)
   printExportResult(('ListOrgMembers(%s)'):format(orgCode), okMembers, members, membersErr)

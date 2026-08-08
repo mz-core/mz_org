@@ -1,5 +1,9 @@
 # MZ_ORG - Contrato com MZ_CORE
 
+> Atualizacao normativa da Fase 0 (2026-07-21): `staff.*` e exclusivamente global; sessao V2, logs seguros e auditoria transacional abaixo substituem qualquer descricao legada conflitante neste documento.
+
+> Atualização do Lote 6D (2026-07-24): a transferência pelo `/org` usa `TransferOrganizationLeadership`, exige membership e `members.set_leader` revalidados no banco e não aceita owner/ACE/Staff como fallback. `SetOrgLeaderByCitizenId` permanece exclusivamente administrativo.
+
 O `mz_org` é interface NUI. O `mz_core` é a fonte real de dados, permissões, organizações, membros, contas e logs.
 
 ## Regras
@@ -21,7 +25,7 @@ Catalogo oficial usado pelo `mz_org`/`mz_core`:
 - Metas: `goals.view`, `goals.manage`.
 - Recrutamento: `recruitment.view`, `recruitment.manage`.
 - Logs: `logs.view`.
-- Staff/admin: `staff.panel.open`, `staff.orgs.view`, `staff.orgs.manage`, `staff.orgs.create`, `staff.orgs.set_leader`, `staff.members.invite`, `staff.members.remove`, `staff.members.promote`, `staff.members.demote`, `staff.staff.manage`, `staff.logs.view`.
+- Staff/admin: `staff.panel.open`, `staff.orgs.view`, `staff.orgs.manage`, `staff.orgs.create`, `staff.orgs.set_leader`, `staff.members.invite`, `staff.members.remove`, `staff.members.promote`, `staff.members.demote`, `staff.roles.manage`, `staff.logs.view`.
 
 Aliases legados mantidos por compatibilidade:
 
@@ -47,6 +51,8 @@ Regras importantes:
 - `CreateOrgFromTemplate(source, payload)`
 - `ListOrgMembers(source, orgCode)`
 - `ListLogs(source, filters)`
+- `ListOrgLogsSecure(source, orgCode, filters)`
+- `ListGlobalLogsSecure(source, filters)`
 - `GetOrgAccount(source, orgCode)`
 - `DepositOrgAccount(source, orgCode, amount, reason)`
 - `WithdrawOrgAccount(source, orgCode, amount, reason)`
@@ -55,9 +61,10 @@ Regras importantes:
 - `InviteOrgMember(source, orgCode, targetSource, options)`
 - `InviteOrgMemberByCitizenId(source, orgCode, targetCitizenId, options)`
 - `RemoveOrgMember(source, orgCode, targetCitizenId)`
-- `PromoteOrgMemberSecure(source, orgCode, targetCitizenId)`
-- `DemoteOrgMemberSecure(source, orgCode, targetCitizenId)`
+- `PromoteOrgMemberSecure(source, orgCode, targetCitizenId, options?)`
+- `DemoteOrgMemberSecure(source, orgCode, targetCitizenId, options?)`
 - `SetOrgLeaderByCitizenId(source, orgCode, targetCitizenId, options)`
+- `TransferOrganizationLeadership(source, orgCode, targetCitizenId, options)`
 - `ListOrgGoals(source, filters)`
 - `GetOrgGoal(source, goalId)`
 - `CreateOrgGoal(source, orgCode, payload)`
@@ -69,6 +76,8 @@ Regras importantes:
 - `CancelOrgRecruitment(source, recruitmentId, reason)`
 
 ## Sessão esperada
+
+O contrato normativo atual e `SESSION_V2_CONTRACT_FINAL.md`. A estrutura abaixo permanece somente como DTO de compatibilidade derivado da V2.
 
 ```lua
 {
@@ -257,6 +266,19 @@ Regras:
 - `mz_org_grades` possui coluna `active`; desativar/reativar cargo e feito sem DELETE fisico;
 - logs: `org.grade.create`, `org.grade.update`, `org.grade.create.blocked`, `org.grade.update.blocked`.
 
+Contrato organizacional separado, usado somente pelo `/org`:
+
+```lua
+exports['mz_core']:CreateOrganizationGrade(source, orgCode, payload)
+exports['mz_core']:UpdateOrganizationGradeBasic(source, orgCode, gradeId, payload)
+exports['mz_core']:DisableOrganizationGrade(source, orgCode, gradeId, reason)
+exports['mz_core']:ReactivateOrganizationGrade(source, orgCode, gradeId, reason)
+exports['mz_core']:AddOrganizationGradePermission(source, orgCode, gradeId, capability, reason)
+exports['mz_core']:RemoveOrganizationGradePermission(source, orgCode, gradeId, capability, reason)
+```
+
+Esse contrato exige membership ativo e `manage.permissions` resolvida diretamente do cargo. Ele protege cargo igual/superior, aceita somente herança inferior e impede delegar capability que o ator não possui. `staff.*` e `members.set_leader` permanecem fora desse fluxo.
+
 #### Editar dados basicos
 
 Local da UI:
@@ -366,6 +388,39 @@ Logs:
 
 - sucesso: `org.member.set_leader`;
 - bloqueio: `org.member.set_leader.blocked`.
+
+#### Transferir liderança pelo `/org`
+
+Contrato separado do Staff:
+
+```lua
+exports['mz_core']:TransferOrganizationLeadership(source, orgCode, targetCitizenId, {
+  organizationRevision = 7,
+  reason = 'Sucessão aprovada'
+})
+```
+
+Evento contextual:
+
+```text
+mz_org:server:organizationTransferLeadership
+```
+
+Regras:
+
+- gate `Config.Interface.organizationLeadershipTransfer` precisa estar habilitado;
+- o gate inicia `false`;
+- ator precisa ser membro ativo/não expirado e possuir `members.set_leader`;
+- owner, ACE e `staff.*` não são fallback;
+- ator precisa ser o único membro ativo/não expirado no maior cargo ativo;
+- alvo precisa ser membro ativo/não expirado da mesma organização e ocupar cargo inferior;
+- o líder anterior recebe o cargo ativo imediatamente abaixo do maior;
+- as duas mudanças, incremento de revision e auditoria pertencem à mesma transação;
+- a organização primária não é alterada;
+- sucesso exige `auditId`;
+- zero ou múltiplos líderes exigem reparo Staff e não são corrigidos automaticamente.
+
+Contrato completo: `docs/ORGANIZATION_LEADERSHIP_TRANSFER_CONTRACT_LOT_6D.md`.
 
 ### Recrutamento/candidaturas
 
@@ -766,7 +821,7 @@ O `source` do autor nunca vem do frontend. O `mz_org` usa o `source` real do eve
 exports['mz_core']:InviteOrgMemberByCitizenId(source, orgCode, targetCitizenId, options)
 ```
 
-O callback ainda aceita `targetId` apenas como fallback de debug quando `Config.Debug` esta ativo no `mz_org`; a UI normal nao envia source/ID online.
+O callback aceita `targetId` apenas como fallback legado explicitamente opt-in por `Config.AllowLegacyTargetSourceInvite == true`. O valor padrao e `false`, e a UI normal nao envia source/ID online.
 
 Resposta de sucesso:
 
@@ -830,8 +885,8 @@ Payload aceito pela NUI:
 O `source` do autor nunca vem do frontend. O `mz_org` usa o `source` real do evento server-side e chama os wrappers seguros:
 
 ```lua
-exports['mz_core']:PromoteOrgMemberSecure(source, orgCode, targetCitizenId)
-exports['mz_core']:DemoteOrgMemberSecure(source, orgCode, targetCitizenId)
+exports['mz_core']:PromoteOrgMemberSecure(source, orgCode, targetCitizenId, { reason = reason })
+exports['mz_core']:DemoteOrgMemberSecure(source, orgCode, targetCitizenId, { reason = reason })
 ```
 
 Os exports antigos `PromoteOrgMember(citizenid, orgCode, actor)` e `DemoteOrgMember(citizenid, orgCode, actor)` foram preservados para compatibilidade.
@@ -848,7 +903,8 @@ Resposta de sucesso:
     oldGrade = 1,
     newGrade = 2,
     oldGradeCode = "recruta",
-    newGradeCode = "membro"
+    newGradeCode = "membro",
+    auditId = "grade:opaque-audit-id"
   }
 }
 ```
@@ -1091,6 +1147,26 @@ Logs:
 - `org.grade.permission.add`;
 - `org.grade.permission.remove`;
 - bloqueios equivalentes com sufixo `.blocked`.
+
+## Contratos de logs da Fase 0
+
+```lua
+ListOrgLogsSecure(source, orgCode, filters)
+ListGlobalLogsSecure(source, filters)
+```
+
+- organizacional: owner, `staff.logs.view` ou `CanOrg(source, orgCode, 'logs.view')`, com `WHERE org_code = ?`;
+- global: owner ou `staff.logs.view`, com `org_code IS NULL`;
+- `staff.orgs.manage` nao concede logs globais;
+- `ListLogs` permanece somente como dispatcher compativel e nunca troca de escopo em caso de falha.
+
+## Regra global `staff.*`
+
+- `HasGlobalPermission`: owner ACE, ACE explicito ou override global explicito;
+- `HasPermission` nao resolve `staff.*`;
+- `CanOrg` rejeita `staff.*`;
+- cargos, base permissions, heranca, access model e seeds organizacionais ignoram/rejeitam `staff.*`;
+- `staff.orgs.set_leader` mantem o nome, mas e somente global.
 
 ## Comandos
 

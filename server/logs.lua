@@ -83,6 +83,7 @@ local function normalizeLog(row)
 
   return {
     id = row.id,
+    scope = row.scope,
     createdAt = row.createdAt or row.created_at,
     category = row.category or row.scope,
     action = row.action,
@@ -102,15 +103,21 @@ RegisterNetEvent('mz_org:server:listLogs', function(requestId, payload)
   local src = source
   local filters = normalizeFilters(payload)
 
-  local rows, err = safeExport('mz_core', 'ListLogs', src, filters)
+  local exportName = filters.orgCode and 'ListOrgLogsSecure' or 'ListGlobalLogsSecure'
+  local rows, err
+  if filters.orgCode then
+    rows, err = safeExport('mz_core', exportName, src, filters.orgCode, filters)
+  else
+    rows, err = safeExport('mz_core', exportName, src, filters)
+  end
   if rows == false then
     sendResponse(src, requestId, fail(err == 'forbidden' and 'Sem permissao para visualizar logs.' or 'Nao foi possivel listar logs.'))
     return
   end
 
   if type(rows) ~= 'table' then
-    debugPrint('ListLogs indisponivel ou falhou no mz_core; retornando lista vazia segura.')
-    sendResponse(src, requestId, ok({}))
+    debugPrint(('%s indisponivel ou falhou no mz_core; negando por padrao.'):format(exportName))
+    sendResponse(src, requestId, fail('Servico de logs indisponivel.'))
     return
   end
 

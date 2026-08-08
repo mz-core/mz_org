@@ -153,12 +153,15 @@
   function resetContextLoads() {
     var current = state();
     current.logs.loaded = false;
+    current.logs.loading = false;
     current.logs.loadedKey = '';
     current.logs.data = [];
     current.recruitment.loaded = false;
+    current.recruitment.loading = false;
     current.recruitment.loadedKey = '';
     current.recruitment.data = [];
     current.goals.loaded = false;
+    current.goals.loading = false;
     current.goals.loadedKey = '';
     current.goals.data = [];
   }
@@ -192,6 +195,11 @@
 
   function applyInitialModule() {
     var current = state();
+    if (current.activePanel !== 'hub' && !perms().canOpenPanel(current.session, current.activePanel)) {
+      current.activePanel = 'hub';
+      current.activeShell = 'hub';
+      current.requestedPanel = 'hub';
+    }
     var requested = current.requestedInitialModule || getPanel(current.activePanel).initialModule || 'dashboard';
     current.activeModule = perms().canViewModule(current.session, requested) ? requested : firstAllowedModule();
     current.activeShell = current.activePanel || shellForModule(current.activeModule) || 'hub';
@@ -208,6 +216,7 @@
   function setActiveShell(shell, options) {
     var current = state();
     var panel = getPanel(shell || 'hub');
+    if ((panel.id || shell) !== 'hub' && !perms().canOpenPanel(current.session, panel.id || shell)) return;
     current.activeShell = panel.id || shell || 'hub';
     current.activePanel = current.activeShell;
     current.requestedPanel = current.activePanel;
@@ -314,48 +323,67 @@
     current.orgView.accessError = null;
     render();
 
+    function isCurrentRequest() {
+      return current.orgView.loadedKey === key && selectedOrgCode() === code;
+    }
+
     window.MZOrgService.getOrg(code).then(function (data) {
+      if (!isCurrentRequest()) return;
       current.orgView.detail = data || null;
     }).catch(function (err) {
+      if (!isCurrentRequest()) return;
       current.orgView.detailError = err.message;
     }).finally(function () {
+      if (!isCurrentRequest()) return;
       current.orgView.detailLoading = false;
       render();
     });
 
     window.MZOrgMemberService.listMembers(code).then(function (data) {
+      if (!isCurrentRequest()) return;
       current.orgView.members = Array.isArray(data) ? data : [];
     }).catch(function (err) {
+      if (!isCurrentRequest()) return;
       current.orgView.membersError = err.message;
     }).finally(function () {
+      if (!isCurrentRequest()) return;
       current.orgView.membersLoading = false;
       render();
     });
 
     window.MZOrgBankService.getOrgBank(code).then(function (data) {
+      if (!isCurrentRequest()) return;
       current.orgView.bank = data || null;
     }).catch(function (err) {
+      if (!isCurrentRequest()) return;
       current.orgView.bankError = err.message;
     }).finally(function () {
+      if (!isCurrentRequest()) return;
       current.orgView.bankLoading = false;
       render();
     });
 
     window.MZOrgBankService.listOrgBankTransactions(code, { limit: 50 }).then(function (data) {
+      if (!isCurrentRequest()) return;
       current.orgView.transactions = Array.isArray(data) ? data : [];
     }).catch(function (err) {
+      if (!isCurrentRequest()) return;
       current.orgView.transactionsError = err.message;
     }).finally(function () {
+      if (!isCurrentRequest()) return;
       current.orgView.transactionsLoading = false;
       render();
     });
 
     window.MZOrgAccessService.getOrgAccess(code).then(function (data) {
+      if (!isCurrentRequest()) return;
       current.orgView.access = data || null;
       current.cache.accessByOrg[code] = current.orgView.access;
     }).catch(function (err) {
+      if (!isCurrentRequest()) return;
       current.orgView.accessError = err.message;
     }).finally(function () {
+      if (!isCurrentRequest()) return;
       current.orgView.accessLoading = false;
       render();
     });
@@ -373,19 +401,25 @@
     render();
 
     window.MZOrgBankService.getOrgBank(code).then(function (data) {
+      if (selectedOrgCode() !== code) return;
       current.orgView.bank = data || null;
     }).catch(function (err) {
+      if (selectedOrgCode() !== code) return;
       current.orgView.bankError = err.message;
     }).finally(function () {
+      if (selectedOrgCode() !== code) return;
       current.orgView.bankLoading = false;
       render();
     });
 
     window.MZOrgBankService.listOrgBankTransactions(code, { limit: 50 }).then(function (data) {
+      if (selectedOrgCode() !== code) return;
       current.orgView.transactions = Array.isArray(data) ? data : [];
     }).catch(function (err) {
+      if (selectedOrgCode() !== code) return;
       current.orgView.transactionsError = err.message;
     }).finally(function () {
+      if (selectedOrgCode() !== code) return;
       current.orgView.transactionsLoading = false;
       render();
     });
@@ -422,12 +456,15 @@
     render();
 
     window.MZOrgLogService.listLogs(filters).then(function (data) {
+      if (current.logs.loadedKey !== key) return;
       current.logs.data = Array.isArray(data) ? data : [];
       current.logs.loaded = true;
       current.cache.logs = current.logs.data;
     }).catch(function (err) {
+      if (current.logs.loadedKey !== key) return;
       current.logs.error = err.message;
     }).finally(function () {
+      if (current.logs.loadedKey !== key) return;
       current.logs.loading = false;
       render();
     });
@@ -477,11 +514,14 @@
     if (code) filters.orgCode = code;
 
     window.MZOrgRecruitmentService.listRecruitment(code, filters).then(function (items) {
+      if (current.recruitment.loadedKey !== key) return;
       current.recruitment.data = Array.isArray(items) ? items : [];
       current.recruitment.loaded = true;
     }).catch(function (err) {
+      if (current.recruitment.loadedKey !== key) return;
       current.recruitment.error = err.message;
     }).finally(function () {
+      if (current.recruitment.loadedKey !== key) return;
       current.recruitment.loading = false;
       render();
     });
@@ -510,11 +550,14 @@
     if (code) filters.orgCode = code;
 
     window.MZOrgGoalService.listGoals(filters).then(function (items) {
+      if (current.goals.loadedKey !== key) return;
       current.goals.data = Array.isArray(items) ? items : [];
       current.goals.loaded = true;
     }).catch(function (err) {
+      if (current.goals.loadedKey !== key) return;
       current.goals.error = err.message;
     }).finally(function () {
+      if (current.goals.loadedKey !== key) return;
       current.goals.loading = false;
       render();
     });
@@ -1837,6 +1880,7 @@
       tasks.recruitment,
       tasks.logs
     ]).then(function (results) {
+      if (!details.open || details.orgCode !== orgCode) return;
       var keys = ['org', 'access', 'members', 'bank', 'transactions', 'goals', 'recruitment', 'logs'];
       var data = {
         org: details.data && details.data.org,
@@ -1859,8 +1903,10 @@
       if (!data.org) data.org = findStaffOrgByCode(orgCode);
       details.data = data;
     }).catch(function (error) {
+      if (!details.open || details.orgCode !== orgCode) return;
       details.error = detailErrorMessage(error);
     }).finally(function () {
+      if (!details.open || details.orgCode !== orgCode) return;
       details.loading = false;
       render();
     });

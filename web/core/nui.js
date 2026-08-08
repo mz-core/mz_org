@@ -2,6 +2,7 @@
   'use strict';
 
   var sessionTimer = null;
+  var requestSequence = 0;
 
   function current() {
     return window.MZOrgState.state;
@@ -15,15 +16,54 @@
     return inFiveM() ? window.GetParentResourceName() : 'mz_org';
   }
 
+  function activeContextKey() {
+    var state = current();
+    if (state.activePanel === 'staff') {
+      return state.activeOrgCode ? 'staff:org:' + state.activeOrgCode : 'staff';
+    }
+    return state.activeOrgCode ? 'org:' + state.activeOrgCode : (state.activePanel || 'hub');
+  }
+
+  function contextualRequest(eventName, payload) {
+    if (eventName === 'session:get' || eventName === 'close') return null;
+    var state = current();
+    var session = state.session || {};
+    requestSequence += 1;
+    if (requestSequence > 999999) requestSequence = 1;
+    return {
+      version: 2,
+      requestId: 'nui-' + requestSequence,
+      sessionRevision: session.revision || session.sessionId || null,
+      contextKey: activeContextKey(),
+      payload: payload || {}
+    };
+  }
+
+  function responseIsCurrent(envelope) {
+    if (!envelope) return true;
+    var state = current();
+    var session = state.session || {};
+    return state.isOpen === true
+      && envelope.sessionRevision === (session.revision || session.sessionId || null)
+      && envelope.contextKey === activeContextKey();
+  }
+
   function fetchNui(eventName, payload) {
     if (!inFiveM()) return mockNui(eventName, payload || {});
+
+    var envelope = contextualRequest(eventName, payload || {});
 
     return fetch('https://' + resourceName() + '/' + eventName, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json; charset=UTF-8' },
-      body: JSON.stringify(payload || {})
+      body: JSON.stringify(envelope || payload || {})
     }).then(function (response) {
       return response.json();
+    }).then(function (response) {
+      if (!responseIsCurrent(envelope)) {
+        return { ok: false, error: 'stale_context', stale: true };
+      }
+      return response;
     }).catch(function () {
       return { ok: false, error: 'Falha ao comunicar com a NUI.' };
     });
@@ -57,7 +97,13 @@
 
     window.MZOrgRouter.render();
 
-    fetchNui('session:get').then(function (response) {
+    var requestedEntry = panelMode === 'staff' ? 'staff' : (panelMode === 'hub' ? 'hub' : 'organization');
+    var requestedType = panelMode === 'illegal' ? 'gang' : panelMode;
+    fetchNui('session:get', {
+      requestedEntry: requestedEntry,
+      requestedType: requestedEntry === 'organization' ? requestedType : null,
+      command: panelMode || 'hub'
+    }).then(function (response) {
       if (response && response.ok === false) {
         state.loadingSession = false;
         state.sessionError = response.error || 'Nao foi possivel solicitar sessao.';

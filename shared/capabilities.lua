@@ -28,19 +28,6 @@ MZOrgCapabilities = {
   -- Logs
   'logs.view',
 
-  -- Staff/admin
-  'staff.panel.open',
-  'staff.orgs.view',
-  'staff.orgs.manage',
-  'staff.orgs.create',
-  'staff.orgs.set_leader',
-  'staff.members.invite',
-  'staff.members.remove',
-  'staff.members.promote',
-  'staff.members.demote',
-  'staff.staff.manage',
-  'staff.logs.view',
-
   -- Aliases legados mantidos para compatibilidade
   'members.kick',
   'members.suspend',
@@ -71,13 +58,31 @@ MZOrgCapabilities = {
   'highcommand',
   'command.full',
 
-  -- Staff legado/dominio
-  'staff.report.view',
-  'staff.kick',
-  'staff.spectate',
-  'staff.ban',
-  'staff.teleport',
-  'staff.players.manage',
+  -- Instalacoes e atividades organizacionais. A Fase 1 apenas reserva os
+  -- codigos; nenhum seed recebe estas capabilities automaticamente.
+  'facility.view',
+  'facility.purchase',
+  'facility.upgrade',
+  'facility.manage',
+  'facility.furniture.view',
+  'facility.furniture.buy',
+  'facility.furniture.place',
+  'facility.furniture.move',
+  'facility.furniture.store',
+  'activities.view',
+  'activities.start',
+  'activities.cancel',
+  'activities.collect',
+  'activities.manage',
+  'research.view',
+  'research.unlock',
+  'drugs.process',
+  'drugs.package',
+  'weapons.craft',
+  'weapons.repair',
+  'weapons.attachments',
+  'ammo.craft',
+  'laundering.operate',
 
   -- VIP
   'vip.chat.tag',

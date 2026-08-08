@@ -102,59 +102,38 @@ local function isAceAllowed(src, ace)
 end
 
 local function isOwner(src)
-  return isAceAllowed(src, Config.OwnerAce)
+  return MZOrgSecurity.IsOwner(src)
 end
 
 local function canViewGoals(src, orgCode)
   if isOwner(src) then return true end
-
-  if safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.view') == true then
-    return true
-  end
-
-  if safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.manage') == true then
-    return true
-  end
-
-  if safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.create') == true then
-    return true
-  end
-
-  if safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.set_leader') == true then
-    return true
-  end
-
   if not orgCode then
     return false
   end
 
-  if safeExport('mz_core', 'CanOrg', src, orgCode, 'goals.view') == true then
+  if MZOrgSecurity.CanOrg(src, orgCode, 'goals.view') then
     return true
   end
 
-  if safeExport('mz_core', 'CanOrg', src, orgCode, 'goals.manage') == true then
+  if MZOrgSecurity.CanOrg(src, orgCode, 'goals.manage') then
     return true
   end
 
-  return safeExport('mz_core', 'CanOrg', src, orgCode, 'org.view') == true
+  return MZOrgSecurity.CanOrg(src, orgCode, 'org.view')
 end
 
 local function canManageGoals(src, orgCode)
   if isOwner(src) then return true end
 
-  if safeExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.manage') == true then
-    return true
-  end
-
   if not orgCode then
     return false
   end
 
-  if safeExport('mz_core', 'CanOrg', src, orgCode, 'goals.manage') == true then
+  if MZOrgSecurity.CanOrg(src, orgCode, 'goals.manage') then
     return true
   end
 
-  return safeExport('mz_core', 'CanOrg', src, orgCode, 'manage.goals') == true
+  return MZOrgSecurity.CanOrg(src, orgCode, 'manage.goals')
 end
 
 local function normalizeFilters(payload)

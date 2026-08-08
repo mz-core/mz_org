@@ -1,5 +1,7 @@
 # Auditoria de identidade, contexto, permissoes e seguranca
 
+> Atualização de 2026-07-26: as seções históricas sobre Staff devem ser lidas junto do contrato atual em `mz_core/docs/STAFF_HIERARCHY_CONTRACT.md`. Membership da organização legada `staff` não concede `staff.*`; os cargos globais persistentes usam `staff.roles.manage` e permissões granulares de comandos.
+
 ## Escopo
 
 Esta revisao cobre `mz_core` e `mz_org` no estado atual dos arquivos. A auditoria original mapeou riscos e fases; depois dela foram implementadas a fase financeira permitida e a migracao do convite principal para `citizenid`, mantendo validacao server-side e sem aceitar `source` da NUI.
@@ -7,7 +9,7 @@ Esta revisao cobre `mz_core` e `mz_org` no estado atual dos arquivos. A auditori
 ## Diagnostico executivo
 
 - O identificador fixo real do personagem no `mz_core` e `citizenid`.
-- O convite principal do painel agora usa `citizenid`; `targetId/source` ficou apenas como fallback de debug no `mz_org`.
+- O convite principal do painel agora usa `citizenid`; `targetId/source` ficou apenas como fallback legado opt-in, desativado por padrao no `mz_org`.
 - Remover, promover e rebaixar ja usam `citizenid` no contrato NUI e no wrapper seguro do core.
 - `/org` e `/gang` ja usam `activeOrgCode` no frontend para membros, banco, metas, cargos, recrutamento e logs.
 - Banco de org agora usa callbacks `org-bank:deposit`, `org-bank:withdraw` e `org-bank:transactions`, sempre com `orgCode` ativo e `source` real no servidor.
@@ -66,7 +68,7 @@ Estado implementado:
 
 1. O callback NUI existente `members:invite` foi mantido.
 2. O payload principal agora e `{ orgCode, citizenid, gradeLevel?, gradeCode? }`.
-3. `targetId` permanece apenas como fallback/debug temporario quando `Config.Debug` esta ativo.
+3. `targetId` permanece apenas como fallback legado temporario, explicitamente opt-in por `Config.AllowLegacyTargetSourceInvite`; o padrao e `false`.
 4. O `mz_core` expoe `InviteOrgMemberByCitizenId(source, orgCode, targetCitizenId, options)`.
 5. Esse wrapper valida:
    - ator real pelo `source`;
@@ -320,32 +322,20 @@ Gerenciamento basico de cargos no detalhe:
 
 ## Hierarquia staff
 
-Seed atual da org staff:
+Estado implementado:
 
-- Helper level 1: `staff.report.view`.
-- Moderador level 2: `staff.kick`, `staff.spectate`.
-- Admin level 3: `staff.ban`, `staff.teleport`, `staff.orgs.manage`, `staff.orgs.set_leader`.
-- Base da org staff: `staff.panel.open`.
-
-Problemas:
-
-- Staff e tratada como org comum para membership/cargos, mas as acoes seguras do core usam permissao global para alguns bypasses.
-- `staff.panel.open` nao conta mais como staff ator em convite/remocao/promocao de membros de org.
-- Nao ha capabilities especificas para gerenciar staff como `staff.members.invite/remove/promote/demote`.
-- Nao ha regra explicita documentada para Helper nao mexer em Moderador/Admin.
-
-Regra proposta:
-
-- Owner ACE e topo absoluto.
-- Staff so mexe em staff abaixo do proprio level.
-- Staff nao promove alguem para level igual/superior ao proprio.
-- Staff nao remove/rebaixa cargo igual/superior.
-- Recrutar/dispensar staff exige capability especifica:
+- Staff Supremo/Owner ACE e topo absoluto, com nível virtual e fora do banco;
+- cargos padrão persistentes: Suporte 100, Moderador 300, Administrador 700 e Gerente Staff 900;
+- Staff administra somente cargos e atribuições estritamente inferiores;
+- Staff não altera a própria atribuição nem concede permissão que não possui;
+- membership da organização legada `staff` não concede autoridade global;
+- gerenciar cargos e atribuições exige:
+  - `staff.roles.manage`
+- operar membros de organizações exige a permissão específica:
   - `staff.members.invite`
   - `staff.members.remove`
   - `staff.members.promote`
   - `staff.members.demote`
-  - `staff.staff.manage`
 
 ## ACE owner
 
@@ -392,7 +382,7 @@ Existem no catalogo compartilhado:
 - `manage.account`
 - `manage.goals`
 
-Usadas em seed/codigo mas ausentes ou nao padronizadas no catalogo:
+Lista histórica que motivou a padronização:
 
 - `recruitment.view`
 - `recruitment.manage`
@@ -402,22 +392,18 @@ Usadas em seed/codigo mas ausentes ou nao padronizadas no catalogo:
 - `command.full`
 - `org.settings`
 - `staff.panel.open`
-- `staff.report.view`
-- `staff.kick`
-- `staff.spectate`
-- `staff.ban`
 - `staff.teleport`
 - `staff.orgs.manage`
 - `staff.orgs.set_leader`
 - `staff.logs.view`
 
-Ainda faltantes/recomendadas para fase staff completa:
+Implementadas para a fase Staff:
 
 - `staff.members.invite`
 - `staff.members.remove`
 - `staff.members.promote`
 - `staff.members.demote`
-- `staff.staff.manage`
+- `staff.roles.manage`
 
 Duplicidades a padronizar:
 
@@ -455,7 +441,7 @@ Staff:
 - `staff.members.remove`
 - `staff.members.promote`
 - `staff.members.demote`
-- `staff.staff.manage`
+- `staff.roles.manage`
 - `staff.logs.view`
 
 Aliases legados mantidos:
@@ -480,7 +466,7 @@ Regra revisada: `staff.panel.open` identifica/libera o painel staff, mas nao aut
 
 - Status: implementada.
 - `members:invite` aceita `citizenid` como principal.
-- `targetId/source` permanece apenas como fallback temporario/debug.
+- `targetId/source` permanece apenas como fallback legado opt-in, desativado por padrao.
 - Wrapper seguro no core: `InviteOrgMemberByCitizenId`.
 - UI pede CitizenID/passaporte, nao ID online.
 

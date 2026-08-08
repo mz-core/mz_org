@@ -1,11 +1,30 @@
 Config = Config or {}
 
-Config.Debug = true
+Config.Debug = false
 
 Config.UseMockSession = false
-Config.AllowDevMockSession = Config.Debug == true
-Config.DebugCommands = Config.Debug == true
+Config.AllowDevMockSession = false
+Config.DebugCommands = false
+Config.AllowLegacyTargetSourceInvite = false
 Config.NuiCallbackTimeoutMs = 5000
+
+Config.Interface = {
+  mode = 'hybrid',
+  staffMenu = true,
+  organizationMenu = true,
+  organizationLeadershipTransfer = false,
+  legacyPanel = true,
+  legacyCommands = true
+}
+
+Config.MenuArchitecture = {
+  enabled = true,
+  staffMenuEnabled = true,
+  staffCommand = 'stafforg',
+  staffAliasCommandEnabled = false,
+  legacyStaffCommandEnabled = true,
+  pageSize = 20
+}
 
 Config.Commands = {
   Dev = 'mzorg',

@@ -1,5 +1,7 @@
 # MZ_ORG - Segurança
 
+> Fase 0 implementada em 2026-07-21. Runtime FiveM ainda precisa do checklist em `PHASE_0_SECURITY_TEST_CHECKLIST.md`.
+
 Este documento define as regras de seguranca para o painel `mz_org`.
 
 ## Principio central
@@ -28,6 +30,8 @@ O `mz_core` deve ser a fonte real para:
 - Logs/auditoria.
 
 O painel nunca deve aceitar `isOwner`, `permissions`, `capabilities`, `grade`, `orgs`, `source` ou `citizenid` enviados pelo frontend como verdade. A sessao deve vir do server/core.
+
+Permissoes `staff.*` sao globais. Elas nunca sao capabilities de uma organizacao e nunca podem ser resolvidas por cargo, heranca, seed ou `CanOrg`.
 
 ## Permissao maxima
 
@@ -84,6 +88,8 @@ Acoes sensiveis devem gerar log em dois casos:
 
 O log deve conter ator, alvo, org, capability exigida, resultado e motivo da negacao quando houver.
 
+Promocao e rebaixamento sao concluidos somente quando a mudanca de grade e o INSERT de auditoria confirmam a mesma transacao. Sucesso sem `auditId` e invalido.
+
 ## Comandos
 
 Os comandos `/mzorg`, `/painel`, `/org`, `/gang`, `/staff`, `/vip`, `/business`, `/government` e `/event` apenas abrem a mesma NUI em um modo visual desejado. Eles nao concedem permissao.
@@ -95,3 +101,13 @@ O frontend pode cair para o primeiro modulo permitido quando o modulo inicial fo
 A sessao enviada ao frontend deve ser montada no server a partir do `mz_core`.
 
 A sessao pode conter dados para UX, como modulos liberados e capabilities visuais, mas qualquer callback deve recomputar permissao real no server antes de executar acao.
+
+A sessao V2 separa `global`, `organizations` e `staff`, possui `revision` opaca e resolve entrada por `ResolvePanelEntry`. `modules` existe apenas como compatibilidade derivada.
+
+## Logs estruturais
+
+Logs organizacionais usam coluna `org_code` e igualdade exata. Busca em mensagem, target ou JSON nunca delimita organizacao. Consulta global e consulta de org sao contratos separados e nao possuem fallback entre si.
+
+## Organizacoes arquivadas
+
+Organizacao arquivada nao entra no contexto pessoal e bloqueia banco, membros, cargos, metas, recrutamento, lideranca e demais mutations. Staff com `staff.orgs.view` ve somente metadados. No Staff Menu do Lote 4, arquivamento exige `staff.orgs.archive` e reativacao exige `staff.orgs.restore`; `staff.orgs.manage` permanece apenas como compatibilidade das rotas legadas e nao amplia silenciosamente o menu novo.

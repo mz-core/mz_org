@@ -97,7 +97,7 @@
       if (module && canViewModule(current.session, id)) modules.push(module);
     });
 
-    if (!modules.length && canViewModule(current.session, 'dashboard')) {
+    if (!modules.length && (panelId || current.activePanel) === 'hub' && canViewModule(current.session, 'dashboard')) {
       modules.push(window.MZOrgState.moduleById.dashboard);
     }
 
@@ -108,6 +108,18 @@
     if (typeof session === 'string') {
       panelId = session;
       session = state().session;
+    }
+    if (!session) return false;
+    if (panelId === 'hub') return true;
+    if (panelId === 'staff') {
+      return isOwner(session)
+        || hasModule(session, 'staff')
+        || hasGlobalPermission(session, 'staff.panel.open')
+        || hasGlobalPermission(session, 'staff.orgs.view')
+        || hasGlobalPermission(session, 'staff.orgs.manage')
+        || hasGlobalPermission(session, 'staff.orgs.create')
+        || hasGlobalPermission(session, 'staff.orgs.set_leader')
+        || hasGlobalPermission(session, 'staff.logs.view');
     }
     return visibleModules(panelId).some(function (module) {
       return canViewModule(session, module.id);

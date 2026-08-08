@@ -1,5 +1,7 @@
 # MZ_ORG - Checklist
 
+> Este arquivo reúne o frontend legado e a arquitetura de menus. O estado normativo dos menus novos está nos documentos `MENU_ARCHITECTURE_IMPLEMENTATION_LOT_*`. Nenhum item está aprovado em runtime sem execução do checklist correspondente.
+
 ## Base
 
 - [x] Resource separado `mz_org` dependente do `mz_core`.
@@ -27,6 +29,7 @@
 - [x] Validacao por org com `CanOrg`.
 - [x] Membros read-only com `ListOrgMembers`.
 - [x] Logs read-only com `ListLogs`.
+- [x] Logs globais removidos do root `/stafforg` e delegados ao `/admin`; logs por organização preservados.
 - [x] Banco read-only com `GetOrgAccount`.
 - [x] Modelo de acesso read-only com `GetOrgAccessModel`.
 - [x] Convite seguro por `citizenid` com `InviteOrgMemberByCitizenId`.
@@ -104,6 +107,24 @@
 - [x] Plano de teste manual criado em `docs/TEST_PLAN.md`.
 - [x] Plano de teste integrado do MVP criado em `docs/MVP_TEST_PLAN.md`.
 
+## Arquitetura `mz_menu` — Lotes 1 a 6D
+
+- [x] Tema por contexto, herança e restauração global no `mz_menu`.
+- [x] Perfis e features compartilhados por tipo.
+- [x] Seletor e menu organizacional contextual.
+- [x] Staff Menu read-only e operacional.
+- [x] Organização read-only: overview, membros, cargos, banco, metas, recrutamento e logs.
+- [x] Organização operacional: membros, depósito/saque, criação de meta e recrutamento.
+- [x] Gestão de cargos inferiores com `manage.permissions`.
+- [x] Transferência de liderança com gate opt-in e `members.set_leader`.
+- [x] Transferência de liderança atômica com `auditId` e revision.
+- [x] Contrato Staff `SetOrgLeaderByCitizenId` preservado e separado.
+- [x] Liderança limitada a `job`, `gang`, `business`, `government` e `event`.
+- [x] VIP tratado como níveis de privilégio sem líder ou gestão por membros; capabilities legadas fora de `vip.*`/leitura são ignoradas em runtime.
+- [x] Seeds de `ambulance`, `mechanic` e `vip` possuem leitura mínima para o menu.
+- [x] Frontend legado preservado no modo híbrido.
+- [ ] Aceite runtime dos Lotes 1 a 6D.
+
 ## Pendente
 
 - [ ] Testes reais em jogo seguindo `docs/MVP_TEST_PLAN.md`.
@@ -130,7 +151,7 @@
 - [x] Convidar player por fluxo de candidatura.
 - [ ] Cooldown de candidatura.
 - [x] Logs de recrutamento.
-- [ ] Metas reais persistidas.
+- [x] Metas reais persistidas com leitura e criação.
 - [ ] Editar meta.
 - [ ] Deletar meta.
 - [ ] Concluir meta.
@@ -147,14 +168,14 @@
 - [x] Arquivar/reativar org sem DELETE fisico.
 - [ ] Excluir org.
 - [ ] Overrides individuais editaveis.
-- [ ] Logs de alteracoes de cargos/permissoes.
+- [x] Logs de alterações de cargos/permissões.
 - [ ] Escolher grade manualmente ao promover/rebaixar.
 - [x] Convite direto por citizenid para player ja existente em `mz_players`.
 - [ ] Convite pendente/offline com aceite do jogador.
 - [ ] Logs detalhados no painel para acoes de membro.
 - [ ] Rate limit avancado para acoes de membro.
-- [ ] Acoes financeiras.
-- [ ] Edicao de grades/capabilities.
+- [x] Ações financeiras de depósito e saque pelo contrato oficial.
+- [x] Edição controlada de grades/capabilities.
 - [ ] Auditoria completa das acoes futuras.
 - [ ] Rate limit para acoes futuras.
 - [ ] Teste visual final em jogo apos polimentos.

@@ -1,33 +1,7 @@
 local isOpen = false
-local requestSeq = 0
-local pendingRequests = {}
-
-local function nextRequestId()
-  requestSeq = requestSeq + 1
-
-  if requestSeq > 999999 then
-    requestSeq = 1
-  end
-
-  return requestSeq
-end
 
 local function sendServerRequest(eventName, payload, cb)
-  local requestId = nextRequestId()
-  pendingRequests[requestId] = cb
-
-  TriggerServerEvent(eventName, requestId, payload or {})
-
-  SetTimeout(Config.NuiCallbackTimeoutMs or 5000, function()
-    local pendingCb = pendingRequests[requestId]
-    if not pendingCb then return end
-
-    pendingRequests[requestId] = nil
-    pendingCb({
-      ok = false,
-      error = 'Tempo esgotado ao consultar o servidor.'
-    })
-  end)
+  return MZOrgMenuRequest.Request(eventName, payload, cb)
 end
 
 local function sendOpenMessage(initialModule, mode)
@@ -67,39 +41,99 @@ local function closePanel()
 end
 
 RegisterCommand(Config.Commands.Dev, function()
-  openPanel('dashboard', 'hub')
+  if MZOrgMenuRouter.CanUseLegacy() then
+    openPanel('dashboard', 'hub')
+  else
+    MZOrgMenuCommon.Notify('Painel legado desativado.', 'error')
+  end
 end, false)
 
 RegisterCommand(Config.Commands.Main, function()
-  openPanel('dashboard', 'hub')
+  if MZOrgMenuRouter.ShouldUseOrganizationMenu() then
+    MZOrgMenuRouter.OpenOrganizations(nil, Config.Commands.Main)
+  elseif MZOrgMenuRouter.CanUseLegacy() then
+    openPanel('dashboard', 'hub')
+  else
+    MZOrgMenuCommon.Notify('Interface organizacional desativada.', 'error')
+  end
 end, false)
 
 RegisterCommand(Config.Commands.Org, function()
-  openPanel('legal', 'legal')
+  if MZOrgMenuRouter.ShouldUseOrganizationMenu() then
+    MZOrgMenuRouter.OpenOrganizations(nil, Config.Commands.Org)
+  elseif MZOrgMenuRouter.CanUseLegacy() then
+    openPanel('legal', 'legal')
+  else
+    MZOrgMenuCommon.Notify('Interface organizacional desativada.', 'error')
+  end
 end, false)
 
 RegisterCommand(Config.Commands.Gang, function()
-  openPanel('gang', 'illegal')
+  if MZOrgMenuRouter.ShouldUseOrganizationMenu() then
+    MZOrgMenuRouter.OpenOrganizations('gang', Config.Commands.Gang)
+  elseif MZOrgMenuRouter.CanUseLegacy() then
+    openPanel('gang', 'illegal')
+  else
+    MZOrgMenuCommon.Notify('Nenhuma interface disponivel.', 'error')
+  end
 end, false)
 
+local staffMenuCommand = (Config.MenuArchitecture or {}).staffCommand or 'stafforg'
+if staffMenuCommand ~= Config.Commands.Staff then
+  RegisterCommand(staffMenuCommand, function()
+    MZOrgStaffMenu.Open()
+  end, false)
+end
+
 RegisterCommand(Config.Commands.Staff, function()
-  openPanel('staff', 'staff')
+  local architecture = type(Config.MenuArchitecture) == 'table' and Config.MenuArchitecture or {}
+  if staffMenuCommand == Config.Commands.Staff or architecture.staffAliasCommandEnabled == true then
+    MZOrgStaffMenu.Open()
+  elseif architecture.legacyStaffCommandEnabled == true and MZOrgMenuRouter.CanUseLegacy() then
+    openPanel('staff', 'staff')
+  else
+    MZOrgMenuCommon.Notify('Comando Staff legado desativado. Use /' .. tostring(architecture.staffCommand or 'stafforg') .. '.', 'error')
+  end
 end, false)
 
 RegisterCommand(Config.Commands.Vip, function()
-  openPanel('vip', 'vip')
+  if MZOrgMenuRouter.ShouldUseOrganizationMenu() then
+    MZOrgMenuRouter.OpenOrganizations('vip', Config.Commands.Vip)
+  elseif MZOrgMenuRouter.CanUseLegacy() then
+    openPanel('vip', 'vip')
+  else
+    MZOrgMenuCommon.Notify('Nenhuma interface disponivel.', 'error')
+  end
 end, false)
 
 RegisterCommand(Config.Commands.Business, function()
-  openPanel('business', 'business')
+  if MZOrgMenuRouter.ShouldUseOrganizationMenu() then
+    MZOrgMenuRouter.OpenOrganizations('business', Config.Commands.Business)
+  elseif MZOrgMenuRouter.CanUseLegacy() then
+    openPanel('business', 'business')
+  else
+    MZOrgMenuCommon.Notify('Nenhuma interface disponivel.', 'error')
+  end
 end, false)
 
 RegisterCommand(Config.Commands.Government, function()
-  openPanel('government', 'government')
+  if MZOrgMenuRouter.ShouldUseOrganizationMenu() then
+    MZOrgMenuRouter.OpenOrganizations('government', Config.Commands.Government)
+  elseif MZOrgMenuRouter.CanUseLegacy() then
+    openPanel('government', 'government')
+  else
+    MZOrgMenuCommon.Notify('Nenhuma interface disponivel.', 'error')
+  end
 end, false)
 
 RegisterCommand(Config.Commands.Event, function()
-  openPanel('event', 'event')
+  if MZOrgMenuRouter.ShouldUseOrganizationMenu() then
+    MZOrgMenuRouter.OpenOrganizations('event', Config.Commands.Event)
+  elseif MZOrgMenuRouter.CanUseLegacy() then
+    openPanel('event', 'event')
+  else
+    MZOrgMenuCommon.Notify('Nenhuma interface disponivel.', 'error')
+  end
 end, false)
 
 RegisterNUICallback('close', function(_, cb)
@@ -107,9 +141,8 @@ RegisterNUICallback('close', function(_, cb)
   cb({ ok = true })
 end)
 
-RegisterNUICallback('session:get', function(_, cb)
-  TriggerServerEvent('mz_org:server:requestSession')
-  cb({ ok = true })
+RegisterNUICallback('session:get', function(data, cb)
+  sendServerRequest('mz_org:server:requestSession', data, cb)
 end)
 
 RegisterNUICallback('orgs:list', function(data, cb)
@@ -251,16 +284,14 @@ RegisterNetEvent('mz_org:client:receiveSession', function(session)
   })
 end)
 
-RegisterNetEvent('mz_org:client:serverResponse', function(requestId, response)
-  requestId = tonumber(requestId)
-  if not requestId then return end
-
-  local cb = pendingRequests[requestId]
-  if not cb then return end
-
-  pendingRequests[requestId] = nil
-  cb(response or {
-    ok = false,
-    error = 'Resposta vazia do servidor.'
-  })
+RegisterNetEvent('mz_org:client:organizationInvalidated', function(change)
+  change = type(change) == 'table' and change or {}
+  local kind = MZOrgMenuRequest.GetActiveKind()
+  local context = MZOrgMenuRequest.GetContext()
+  if kind == 'staff' or (kind == 'organization' and context.orgCode == change.orgCode) then
+    MZOrgMenuRequest.ClearContext(kind)
+    if kind == 'staff' then MZOrgStaffMenu.State = {} end
+    MZOrgMenuCommon.CloseContext()
+    MZOrgMenuCommon.Notify('A organizacao foi alterada. Reabra o menu para carregar a revisao atual.', 'warning')
+  end
 end)
