@@ -361,7 +361,7 @@ function MZOrgSession.Build(source, requestedContext)
   source = MZOrgSecurity.NormalizeSource(source)
   if not source then return nil, 'invalid_source' end
   local owner = MZOrgSecurity.IsOwner(source)
-  local player = MZOrgSecurity.SafeExport('GetPlayer', source)
+  local player = MZOrgSecurity.SafeExport('GetPlayerSnapshot', source)
   if type(player) ~= 'table' or not player.citizenid then return nil, 'session_unavailable' end
   local rawOrganizations = MZOrgSecurity.SafeExport('GetPlayerOrgContext', source)
   if rawOrganizations == nil then rawOrganizations = MZOrgSecurity.SafeExport('GetPlayerOrgs', source) end
