@@ -69,8 +69,7 @@ server_scripts {
   'server/bank.lua',
   'server/recruitment.lua',
   'server/goals.lua',
-  'server/logs.lua',
-  'tests/phase0_runtime_runner.lua'
+  'server/logs.lua'
 }
 
 ui_page 'web/index.html'
