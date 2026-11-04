@@ -202,7 +202,7 @@ RegisterNetEvent('mz_org:server:listRecruitment', function(requestId, payload)
     return
   end
 
-  local rows, err = safeExport('mz_core', 'ListOrgRecruitment', src, filters.orgCode, filters)
+  local rows, err = safeExport('mz_org', 'ListOrgRecruitment', src, filters.orgCode, filters)
   if rows == false then
     sendResponse(src, requestId, fail(translateError(err, 'Nao foi possivel listar candidaturas.')))
     return
@@ -240,7 +240,7 @@ RegisterNetEvent('mz_org:server:getRecruitment', function(requestId, payload)
     return
   end
 
-  local row, err = safeExport('mz_core', 'GetOrgRecruitment', src, id)
+  local row, err = safeExport('mz_org', 'GetOrgRecruitment', src, id)
   if row == false then
     sendResponse(src, requestId, fail(translateError(err, 'Nao foi possivel carregar a candidatura.')))
     return
@@ -284,7 +284,7 @@ RegisterNetEvent('mz_org:server:createRecruitment', function(requestId, payload)
     return
   end
 
-  local result, dataOrErr = safeExport('mz_core', 'CreateOrgRecruitment', src, orgCode, {
+  local result, dataOrErr = safeExport('mz_org', 'CreateOrgRecruitment', src, orgCode, {
     citizenid = citizenid,
     desiredGradeLevel = desiredGradeLevel,
     desiredGradeCode = normalizeString(payload.desiredGradeCode or payload.gradeCode, 64),
@@ -314,7 +314,7 @@ RegisterNetEvent('mz_org:server:approveRecruitment', function(requestId, payload
     return
   end
 
-  local result, dataOrErr = safeExport('mz_core', 'ApproveOrgRecruitment', src, id, {
+  local result, dataOrErr = safeExport('mz_org', 'ApproveOrgRecruitment', src, id, {
     gradeLevel = payload.gradeLevel,
     gradeCode = normalizeString(payload.gradeCode, 64),
     note = normalizeString(payload.note, 1000)
@@ -343,7 +343,7 @@ RegisterNetEvent('mz_org:server:rejectRecruitment', function(requestId, payload)
     return
   end
 
-  local result, dataOrErr = safeExport('mz_core', 'RejectOrgRecruitment', src, id, normalizeString(payload.reason or payload.note, 1000))
+  local result, dataOrErr = safeExport('mz_org', 'RejectOrgRecruitment', src, id, normalizeString(payload.reason or payload.note, 1000))
   if result ~= true then
     sendResponse(src, requestId, fail(translateError(dataOrErr, 'Nao foi possivel recusar a candidatura.')))
     return
@@ -367,7 +367,7 @@ RegisterNetEvent('mz_org:server:cancelRecruitment', function(requestId, payload)
     return
   end
 
-  local result, dataOrErr = safeExport('mz_core', 'CancelOrgRecruitment', src, id, normalizeString(payload.reason or payload.note, 1000))
+  local result, dataOrErr = safeExport('mz_org', 'CancelOrgRecruitment', src, id, normalizeString(payload.reason or payload.note, 1000))
   if result ~= true then
     sendResponse(src, requestId, fail(translateError(dataOrErr, 'Nao foi possivel arquivar a candidatura.')))
     return

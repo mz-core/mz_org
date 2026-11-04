@@ -65,7 +65,7 @@ end
 expect(operations:find("capabilities = { 'manage.permissions' }", 1, true), 'guard manage.permissions ausente')
 expect(not operations:find("'staff.orgs.manage'", 1, true), 'fallback Staff encontrado nas operacoes organizacionais')
 
-local coreService = read(root .. '/../mz_core/server/orgs/service.lua')
+local coreService = read(root .. '/server/domain/service.lua')
 expect(coreService:find('ORGANIZATION_GRADE_MANAGEMENT', 1, true), 'sentinel privado do core ausente')
 expect(coreService:find('target_higher_or_equal', 1, true), 'proteção de cargo igual ou superior ausente')
 expect(coreService:find('capability_not_owned', 1, true), 'proteção contra delegação indevida ausente')

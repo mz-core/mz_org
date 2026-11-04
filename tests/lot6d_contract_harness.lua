@@ -129,7 +129,6 @@ MZOrgRepository = {
     if not state.grantCapability then return {} end
     return { { org_id = 10, grade_id = 3, permission = 'members.set_leader', allow = 1 } }
   end,
-  getPlayerOverrides = function() return {} end,
   countActiveMembersByGrade = function() return state.leaderCount end,
   transferOrganizationLeadershipWithAudit = function(data)
     state.transactionCalls = state.transactionCalls + 1
@@ -139,7 +138,7 @@ MZOrgRepository = {
 }
 
 MZOrgService = {}
-dofile(root .. '/../mz_core/server/orgs/service.lua')
+dofile(root .. '/server/domain/service.lua')
 
 local vipTemplate = MZOrgService.getCreationTemplate('vip')
 expect(type(vipTemplate) == 'table', 'template VIP ausente')
@@ -234,7 +233,7 @@ ok, value = MZOrgService.transferOrganizationLeadership(11, 'alpha', 'CID_TARGET
 })
 expect(ok == false and value == 'audit_transaction_failed', 'falha transacional nao foi propagada')
 
-local repository = read(root .. '/../mz_core/server/orgs/repository.lua')
+local repository = read(root .. '/server/domain/repository.lua')
 expect(repository:find('MySQL.transaction.await', 1, true), 'transacao MySQL dedicada ausente')
 expect(repository:find("data.action .. '.precondition_failed'", 1, true), 'assertion de precondicao ausente')
 expect(repository:find("data.action .. '.assertion_failed'", 1, true), 'assertion de rollback transacional ausente')
@@ -245,7 +244,7 @@ expect(
   'is_leader nao esta restrito aos tipos com lideranca'
 )
 
-local exportsFile = read(root .. '/../mz_core/server/orgs/exports.lua')
+local exportsFile = read(root .. '/server/domain/exports.lua')
 expect(exportsFile:find("exports('TransferOrganizationLeadership'", 1, true), 'export explicito do core ausente')
 expect(exportsFile:find("exports('SetOrgLeaderByCitizenId'", 1, true), 'export Staff anterior foi removido')
 
@@ -293,7 +292,7 @@ expect(
 local profiles = read(root .. '/shared/menu_profiles.lua')
 expect(profiles:find('function MZOrgMenuProfiles.SupportsLeadership', 1, true), 'contrato de perfil de lideranca ausente')
 
-local seeds = read(root .. '/../mz_core/server/seed/default_orgs.lua')
+local seeds = read(root .. '/server/domain/default_orgs.lua')
 local function seedBlock(code, nextCode)
   local marker = "code = '" .. code .. "'"
   local startAt = assert(seeds:find(marker, 1, true), 'seed ausente: ' .. code)

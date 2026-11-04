@@ -18,7 +18,7 @@ Antes deste lote, comandos locais e eventos sobre players não revalidavam permi
 - não existe export/evento/repositório para criar, editar ou remover persistentemente garagem pública/organizacional;
 - acesso organizacional suporta membership, duty, grade, primary e capabilities configuradas;
 - catálogo de veículos é consultado no `mz_vehicles`;
-- estado/propriedade de veículos continua no `mz_core`.
+- estado/propriedade de veículos pertence ao `mz_vehicles` desde `POST_VEHICLES_GARAGE_EXTRACTION`.
 
 Conclusão: não persistir garagem em `mz_orgs.config_json` e não criar tabela ad hoc neste lote.
 
@@ -41,7 +41,7 @@ O inventário inicial encontrou somente `SetOrgMemberDuty`, um contrato administ
 
 ### Veículos
 
-`mz_vehicles` fornece catálogo, bloqueio de modelos, propriedades/entidades client e acesso por placa. A persistência de veículos fica no domínio de veículos do `mz_core`; `mz_garagem` orquestra retirada, armazenamento, serviço e impound.
+`mz_vehicles` fornece catálogo, registro persistente, ownership, propriedades/condição, lifecycle, impound e associação runtime. `mz_garagem` orquestra retirada, armazenamento e políticas de garagem por contratos do owner.
 
 ## Ordem recomendada
 

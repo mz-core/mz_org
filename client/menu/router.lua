@@ -46,14 +46,21 @@ end
 
 function MZOrgMenuRouter.ShouldUseOrganizationMenu()
   local interface = type(Config.Interface) == 'table' and Config.Interface or {}
-  local mode = tostring(interface.mode or 'legacy'):lower()
-  return interface.organizationMenu == true and (mode == 'hybrid' or mode == 'menu')
+  local mode = tostring(interface.mode or 'nui'):lower()
+  return interface.organizationMenu == true and mode == 'menu'
 end
 
-function MZOrgMenuRouter.CanUseLegacy()
+function MZOrgMenuRouter.ShouldUseStaffMenu()
   local interface = type(Config.Interface) == 'table' and Config.Interface or {}
-  local mode = tostring(interface.mode or 'legacy'):lower()
-  return mode ~= 'menu' and interface.legacyPanel == true and interface.legacyCommands == true
+  local architecture = type(Config.MenuArchitecture) == 'table' and Config.MenuArchitecture or {}
+  local mode = tostring(interface.mode or 'nui'):lower()
+  return interface.staffMenu == true and architecture.enabled == true and architecture.staffMenuEnabled == true and mode == 'menu'
+end
+
+function MZOrgMenuRouter.CanUseNui()
+  local interface = type(Config.Interface) == 'table' and Config.Interface or {}
+  local mode = tostring(interface.mode or 'nui'):lower()
+  return mode == 'nui' and interface.nuiPanel ~= false and interface.nuiCommands ~= false
 end
 
 function MZOrgMenuRouter.OpenOrganizations(typeFilter, commandName)

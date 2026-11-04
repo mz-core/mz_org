@@ -29,15 +29,15 @@ local function encodeDebug(value)
   return ('<encode failed: %s>'):format(tostring(encoded))
 end
 
-local function callCoreExport(exportName, ...)
-  if GetResourceState('mz_core') ~= 'started' then
-    return false, 'mz_core_not_started'
+local function callExport(resourceName, exportName, ...)
+  if GetResourceState(resourceName) ~= 'started' then
+    return false, resourceName .. '_not_started'
   end
 
   local args = { ... }
   return pcall(function()
-    local coreExports = exports['mz_core']
-    return coreExports[exportName](coreExports, table.unpack(args))
+    local resourceExports = exports[resourceName]
+    return resourceExports[exportName](resourceExports, table.unpack(args))
   end)
 end
 
@@ -72,16 +72,16 @@ RegisterCommand('mzorg_test', function(source, args)
     tostring(orgCode)
   ))
 
-  local okOwner, owner = callCoreExport('HasGlobalPermission', src, Config.OwnerAce or 'group.mz_owner')
+  local okOwner, owner = callExport('mz_core', 'HasGlobalPermission', src, Config.OwnerAce or 'group.mz_owner')
   printExportResult('HasGlobalPermission(group.mz_owner)', okOwner, owner)
 
-  local okStaff, staff = callCoreExport('HasGlobalPermission', src, 'staff.orgs.manage')
+  local okStaff, staff = callExport('mz_core', 'HasGlobalPermission', src, 'staff.orgs.manage')
   printExportResult('HasGlobalPermission(staff.orgs.manage)', okStaff, staff)
 
-  local okContext, context = callCoreExport('GetPlayerOrgContext', src)
+  local okContext, context = callExport('mz_org', 'GetPlayerOrgContext', src)
   printExportResult('GetPlayerOrgContext', okContext, context)
 
-  local okOrg, organization = callCoreExport('GetOrgByCode', orgCode)
+  local okOrg, organization = callExport('mz_org', 'GetOrgByCode', orgCode)
   printExportResult(('GetOrgByCode(%s)'):format(orgCode), okOrg, organization)
 
   local capabilities = {
@@ -96,7 +96,7 @@ RegisterCommand('mzorg_test', function(source, args)
     'vip.chat.tag'
   }
   for _, capability in ipairs(capabilities) do
-    local okCapability, allowed = callCoreExport('CanOrg', src, orgCode, capability)
+    local okCapability, allowed = callExport('mz_org', 'CanOrg', src, orgCode, capability)
     printExportResult(
       ('CanOrg(%s, %s)'):format(orgCode, capability),
       okCapability,
@@ -104,7 +104,7 @@ RegisterCommand('mzorg_test', function(source, args)
     )
   end
 
-  local okMembers, members, membersErr = callCoreExport('ListOrgMembers', src, orgCode)
+  local okMembers, members, membersErr = callExport('mz_org', 'ListOrgMembers', src, orgCode)
   printExportResult(('ListOrgMembers(%s)'):format(orgCode), okMembers, members, membersErr)
 
   print('[mz_org][debug] ---- mzorg_test end ----')

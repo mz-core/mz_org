@@ -58,6 +58,28 @@ MZOrgCapabilities = {
   'highcommand',
   'command.full',
 
+  -- Policia
+  'police.custody',
+  'police.search',
+  'police.seize',
+  'police.impound',
+  'police.road.tools',
+  'police.anpr',
+  'police.radar',
+  'police.evidence.collect',
+  'police.evidence.manage',
+  'police.records.write',
+  'police.citation.issue',
+  'police.warrant.create',
+  'police.warrant.approve',
+  'police.arrest.request',
+  'police.camera.use',
+  'police.camera.view',
+  'police.air.support',
+  'police.tracker.use',
+  'police.tracker.view',
+  'police.forensics.request',
+
   -- Instalacoes e atividades organizacionais. A Fase 1 apenas reserva os
   -- codigos; nenhum seed recebe estas capabilities automaticamente.
   'facility.view',

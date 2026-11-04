@@ -29,7 +29,7 @@ Os eventos, arquivos e callbacks do painel legado permanecem presentes. O endpoi
 
 O servidor captura `source` antes de operações assíncronas, valida sessão/contexto/módulo, recalcula a organização do jogador e aplica DTOs com campos explícitos. O cliente continua descartando respostas de contexto antigo.
 
-O módulo de cargos não envia `playerOverrides`; capabilities do cargo só são visíveis com `manage.permissions`.
+No módulo de cargos, capabilities do cargo só são visíveis com `manage.permissions`.
 
 ## Escopo não iniciado
 

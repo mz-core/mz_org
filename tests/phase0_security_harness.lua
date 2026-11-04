@@ -58,13 +58,6 @@ local grades = {
 }
 
 MZOrgRepository = {
-  getPlayerOverrides = function()
-    local rows = {}
-    for permission, allow in pairs(state.overrides) do
-      rows[#rows + 1] = { permission = permission, allow = allow and 1 or 0 }
-    end
-    return rows
-  end,
   getPlayerMemberships = function()
     return state.memberships or {}
   end,
@@ -94,7 +87,10 @@ MZOrgRepository = {
 }
 
 MZLogService = nil
-dofile('mz_core/server/orgs/service.lua')
+MZStaffService = {
+  HasGlobalPermission = function(_, permission) return state.overrides[permission] == true end
+}
+dofile('mz_org/server/domain/service.lua')
 
 state.owner = false
 state.overrides = {}
@@ -160,7 +156,7 @@ MySQL = {
   insert = { await = function() return 1 end }
 }
 dofile('mz_core/server/logs/service.lua')
-local policeLogs = MZLogService.listOrgLogsSecure(10, 'police', { limit = 50 })
+local policeLogs = MZLogService.listOrganizationLogs('police', { limit = 50 })
 expect('logs police nao retornam police2',
   #policeLogs == 1 and policeLogs[1].orgCode == 'police'
     and capturedSql:find('org_code = ?', 1, true) ~= nil
@@ -169,7 +165,7 @@ expect('logs police nao retornam police2',
 MZPlayerService.getPlayer = function(source) return tonumber(source) == 10 and actor or nil end
 MZOrgRepository.getOrgByCode = function() return orgRow() end
 MZOrgService = nil
-dofile('mz_core/server/orgs/service.lua')
+dofile('mz_org/server/domain/service.lua')
 state.overrides = { ['staff.members.promote'] = true }
 state.orgActive = true
 state.targetGradeId = 1

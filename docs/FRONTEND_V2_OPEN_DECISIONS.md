@@ -20,7 +20,7 @@ Data: 2026-07-21. Esta lista contém somente políticas que o código atual não
 
 **Decisão necessária:** se todo membro com `org.view` pode ver cargos/permissões ou se isso exige capability própria.
 
-**Recomendação padrão:** criar semanticamente `grades.view` ou `org.access.view`; manter os guards atuais como alias temporário até backfill. Não publicar `playerOverrides` a membros comuns sem necessidade operacional.
+**Recomendação padrão:** criar semanticamente `grades.view` ou `org.access.view`; manter os guards atuais como alias temporário até backfill.
 
 **Impacto:** alto. Define visibilidade da rota `org.grades`, conteúdo do detalhe Staff e migração de seeds/cargos.
 

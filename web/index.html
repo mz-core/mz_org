@@ -3,35 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MZ Org</title>
-    <link rel="stylesheet" href="./style.css" />
+    <meta name="description" content="Painel de gestão de organizações do MZ Framework" />
+    <meta name="theme-color" content="#071017" />
+    <title>MZ Organizações</title>
   </head>
   <body>
-    <div id="app" aria-live="polite"></div>
-
-    <!-- Core da NUI tradicional. Ordem intencional: estado, helpers, NUI, services, paineis, router e boot. -->
-    <script src="./core/state.js"></script>
-    <script src="./core/format.js"></script>
-    <script src="./core/ui.js"></script>
-    <script src="./core/permissions.js"></script>
-    <script src="./core/nui.js"></script>
-    <script src="./services/session-service.js"></script>
-    <script src="./services/org-service.js"></script>
-    <script src="./services/member-service.js"></script>
-    <script src="./services/log-service.js"></script>
-    <script src="./services/bank-service.js"></script>
-    <script src="./services/recruitment-service.js"></script>
-    <script src="./services/goal-service.js"></script>
-    <script src="./services/access-service.js"></script>
-    <script src="./panels/hub/index.js"></script>
-    <script src="./panels/legal/index.js"></script>
-    <script src="./panels/illegal/index.js"></script>
-    <script src="./panels/staff/index.js"></script>
-    <script src="./panels/vip/index.js"></script>
-    <script src="./panels/business/index.js"></script>
-    <script src="./panels/government/index.js"></script>
-    <script src="./panels/event/index.js"></script>
-    <script src="./core/router.js"></script>
-    <script src="./script.js"></script>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

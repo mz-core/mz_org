@@ -9,12 +9,12 @@ Config.AllowLegacyTargetSourceInvite = false
 Config.NuiCallbackTimeoutMs = 5000
 
 Config.Interface = {
-  mode = 'hybrid',
-  staffMenu = true,
-  organizationMenu = true,
+  mode = 'nui',
+  staffMenu = false,
+  organizationMenu = false,
   organizationLeadershipTransfer = false,
-  legacyPanel = true,
-  legacyCommands = true
+  nuiPanel = true,
+  nuiCommands = true
 }
 
 Config.MenuArchitecture = {
@@ -22,7 +22,6 @@ Config.MenuArchitecture = {
   staffMenuEnabled = true,
   staffCommand = 'stafforg',
   staffAliasCommandEnabled = false,
-  legacyStaffCommandEnabled = true,
   pageSize = 20
 }
 
@@ -41,6 +40,21 @@ Config.Commands = {
 Config.Command = Config.Commands.Dev
 
 Config.OwnerAce = 'group.mz_owner'
+
+Config.Payroll = {
+  enabled = true,
+  intervalMinutes = 30,
+  requireDuty = true
+}
+
+Config.SeedOrgTypes = {
+  { code = 'job', name = 'Job' },
+  { code = 'gang', name = 'Gang' },
+  { code = 'vip', name = 'VIP' },
+  { code = 'business', name = 'Business' },
+  { code = 'government', name = 'Government' },
+  { code = 'event', name = 'Event' }
+}
 
 Config.DefaultGangGrades = {
   { level = 1, code = 'recruta', name = 'Recruta', salary = 0 },

@@ -970,11 +970,8 @@
       : ui().empty('Sem permissoes base', 'Nenhuma permissao base foi retornada para esta org.');
 
     var gradesBody = grades.length ? renderGradesTable(grades) : ui().empty('Nenhum cargo retornado', 'O core nao retornou grades para esta organizacao.');
-    var overrides = Array.isArray(model.playerOverrides) && model.playerOverrides.length
-      ? '<div class="badge-row">' + model.playerOverrides.map(function (override) { return ui().permissionBadge(override.permission || '-', override.allow === false ? 'danger' : 'info'); }).join('') + '</div>'
-      : ui().empty('Sem ajustes individuais', 'Nenhuma permissao individual foi retornada para sua sessao.');
 
-    return ui().card('Cargos e permissoes', 'Hierarquia, salario e permissoes em linguagem de uso.', '<div class="access-section"><h4>Permissoes base</h4>' + base + '</div><div class="access-section"><h4>Hierarquia</h4>' + gradesBody + '</div><div class="access-section"><h4>Ajustes da sua sessao</h4>' + overrides + '</div>');
+    return ui().card('Cargos e permissoes', 'Hierarquia, salario e permissoes em linguagem de uso.', '<div class="access-section"><h4>Permissoes base</h4>' + base + '</div><div class="access-section"><h4>Hierarquia</h4>' + gradesBody + '</div>');
   }
 
   function renderGradesTable(grades) {

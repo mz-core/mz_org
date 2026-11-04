@@ -99,14 +99,25 @@ local function normalizeLog(row)
   }
 end
 
+local function listOrganizationLogs(source, orgCode, filters)
+  if not (MZOrgSecurity.HasGlobalPermission(source, 'staff.logs.view')
+      or MZOrgSecurity.CanOrg(source, orgCode, 'logs.view')) then
+    return false, 'forbidden'
+  end
+  if not MZOrgSecurity.GetOrg(orgCode) then return false, 'invalid_org' end
+  return safeExport('mz_core', 'ListOrganizationLogs', orgCode, filters)
+end
+
+exports('ListOrgLogsSecure', listOrganizationLogs)
+
 RegisterNetEvent('mz_org:server:listLogs', function(requestId, payload)
   local src = source
   local filters = normalizeFilters(payload)
 
-  local exportName = filters.orgCode and 'ListOrgLogsSecure' or 'ListGlobalLogsSecure'
+  local exportName = filters.orgCode and 'ListOrganizationLogs' or 'ListGlobalLogsSecure'
   local rows, err
   if filters.orgCode then
-    rows, err = safeExport('mz_core', exportName, src, filters.orgCode, filters)
+    rows, err = listOrganizationLogs(src, filters.orgCode, filters)
   else
     rows, err = safeExport('mz_core', exportName, src, filters)
   end

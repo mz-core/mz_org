@@ -288,7 +288,7 @@ function MZOrgSession.InvalidateOrganization(orgCode, action, actorSource)
   end
 end
 
-AddEventHandler('mz_core:internal:organizationChanged', function(change)
+AddEventHandler('mz_org:internal:organizationChanged', function(change)
   if type(change) ~= 'table' then return end
   MZOrgSession.InvalidateOrganization(change.orgCode, change.action, change.actorSource)
 end)
@@ -322,6 +322,20 @@ local function resolveEntry(requested, organizations, staff)
     end
   end
   return false, 'entry_not_allowed', nil
+end
+
+local function projectSessionContexts(requested, organizations, staff)
+  if requested.id == 'staff' then return {}, staff end
+  if requested.id ~= 'organization' then return organizations, nil end
+
+  local scoped = {}
+  for _, organization in ipairs(organizations) do
+    local matchesCode = requested.requestedOrgCode and organization.code == requested.requestedOrgCode
+    local matchesType = not requested.requestedOrgCode
+      and (not requested.requestedType or organization.type == requested.requestedType)
+    if matchesCode or matchesType then scoped[#scoped + 1] = organization end
+  end
+  return scoped, nil
 end
 
 local function buildLegacyModules(owner, organizations, staff)
@@ -380,8 +394,9 @@ function MZOrgSession.Build(source, requestedContext)
   local staff = buildStaffContext(owner, permissions)
   local requested = normalizeRequest(requestedContext)
   local entryAllowed, denialReason, defaultContextId = resolveEntry(requested, organizations, staff)
+  local sessionOrganizations, sessionStaff = projectSessionContexts(requested, organizations, staff)
   local revision = nextRevision(source)
-  local modules = buildLegacyModules(owner, organizations, staff)
+  local modules = buildLegacyModules(owner, sessionOrganizations, sessionStaff)
 
   local user = {
     source = source,
@@ -394,7 +409,7 @@ function MZOrgSession.Build(source, requestedContext)
   }
 
   local legacyOrgs = {}
-  for _, organization in ipairs(organizations) do
+  for _, organization in ipairs(sessionOrganizations) do
     legacyOrgs[#legacyOrgs + 1] = {
       code = organization.code,
       name = organization.name,
@@ -411,8 +426,8 @@ function MZOrgSession.Build(source, requestedContext)
   end
 
   local scopeOrganizations = {}
-  for _, organization in ipairs(organizations) do scopeOrganizations[organization.code] = true end
-  SessionScopes[source] = { staff = staff ~= nil, organizations = scopeOrganizations }
+  for _, organization in ipairs(sessionOrganizations) do scopeOrganizations[organization.code] = true end
+  SessionScopes[source] = { staff = sessionStaff ~= nil, organizations = scopeOrganizations }
 
   return {
     version = 2,
@@ -427,10 +442,10 @@ function MZOrgSession.Build(source, requestedContext)
     defaultContextId = defaultContextId,
     entrypoints = {
       hub = true,
-      staffWorkspace = staff ~= nil,
+      staffWorkspace = sessionStaff ~= nil,
       organizationWorkspaces = (function()
         local codes = {}
-        for _, organization in ipairs(organizations) do codes[#codes + 1] = organization.code end
+        for _, organization in ipairs(sessionOrganizations) do codes[#codes + 1] = organization.code end
         return codes
       end)()
     },
@@ -439,10 +454,10 @@ function MZOrgSession.Build(source, requestedContext)
       permissionGrants = grants,
       features = {}
     },
-    organizations = organizations,
-    contexts = organizations,
-    staff = staff,
-    staffContext = staff,
+    organizations = sessionOrganizations,
+    contexts = sessionOrganizations,
+    staff = sessionStaff,
+    staffContext = sessionStaff,
     compatibility = { modules = modules },
     orgs = legacyOrgs,
     modules = modules

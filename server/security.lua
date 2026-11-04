@@ -37,11 +37,25 @@ function MZOrgSecurity.IsOwner(source)
 end
 
 function MZOrgSecurity.SafeExport(exportName, ...)
-  if GetResourceState('mz_core') ~= 'started' then return nil, 'core_unavailable' end
+  local coreExports = {
+    GetPlayerSnapshot = true,
+    HasGlobalPermission = true,
+    CreateDetailedLog = true,
+    ListOrganizationLogs = true,
+    ListGlobalLogsSecure = true,
+    GetOrganizationAccount = true,
+    DepositOrganizationAccount = true,
+    WithdrawOrganizationAccount = true,
+    ListOrganizationAccountTransactions = true
+  }
+  local resourceName = coreExports[exportName] and 'mz_core' or 'mz_org'
+  if GetResourceState(resourceName) ~= 'started' then
+    return nil, resourceName == 'mz_core' and 'core_unavailable' or 'org_unavailable'
+  end
   local args = { ... }
   local ok, result, extra = pcall(function()
-    local core = exports['mz_core']
-    return core[exportName](core, table.unpack(args))
+    local resource = exports[resourceName]
+    return resource[exportName](resource, table.unpack(args))
   end)
   if not ok then return nil, 'export_failed' end
   return result, extra

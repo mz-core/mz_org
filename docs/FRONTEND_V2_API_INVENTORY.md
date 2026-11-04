@@ -103,11 +103,11 @@ Classificacao:
 | NUI | Evento server / handler | Tipo | Payload atual | Response `data` atual | Export `mz_core` | Permissao usada | Contexto | Problema | Compatibilidade V2 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `logs:list` | `mz_org:server:listLogs`; `server/logs.lua` | read | `{orgCode?,category?,severity?,search?,dateFrom?,dateTo?,limit?,offset?}` | `Log[]` | org: `ListOrgLogsSecure(source,orgCode,filters)`; global: `ListGlobalLogsSecure(source,filters)` | global: owner ou `staff.logs.view`; org: owner, `staff.logs.view` ou `CanOrg('logs.view')` | org ou staff/global | Fase 0 concluida: escopo por `org_code = ?`; global usa `org_code IS NULL`; falha de export e erro, sem fallback. | Nome NUI preservado; envelope V2 recomendado. |
-| `org-access:get` | `mz_org:server:getOrgAccess`; `server/permissions.lua:109-139` | read | `{orgCode}` | `{orgCode,orgName,type,baseCapabilities,grades,playerOverrides}` | `GetOrgAccessModel(source,orgCode)` | core: owner/Staff view-like ou `org.view|members.view` | org ou staff | Nao ha capability dedicada para ver cargos/permissoes; falha vira modelo vazio. | Preservar; route guard provisoria e decisao aberta para capability dedicada. |
+| `org-access:get` | `mz_org:server:getOrgAccess`; `server/permissions.lua:109-139` | read | `{orgCode}` | `{orgCode,orgName,type,baseCapabilities,grades}` | `GetOrgAccessModel(source,orgCode)` | core: owner/Staff view-like ou `org.view|members.view` | org ou staff | Nao ha capability dedicada para ver cargos/permissoes; falha vira modelo vazio. | Preservar; route guard provisoria e decisao aberta para capability dedicada. |
 
 `Log` normalizado: `{id,createdAt,category,action,severity,orgCode,actorName,actorCitizenId,targetName,targetCitizenId,message,reason,meta}`. O `meta` e sanitizado no core, mas o filtro de scoping precisa ser corrigido.
 
-O access model normaliza grades como `{id,level,code,name,salary,priority,active,inheritsGradeId,inheritsLevel,inheritsCode,capabilities,directCapabilities}`. `playerOverrides` e repassado como tabela recebida do core.
+O access model normaliza grades como `{id,level,code,name,salary,priority,active,inheritsGradeId,inheritsLevel,inheritsCode,capabilities,directCapabilities}`.
 
 ## Todos os exports do `mz_core` efetivamente chamados
 

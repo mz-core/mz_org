@@ -75,19 +75,19 @@ ok, sanitized = MZOrgMenuMutations.SanitizeDutyPoint({
 }, 'business')
 expect('desativacao explicita e aceita', ok == true and sanitized.dutyPoint.enabled == false)
 
-local coreService = read(root .. '/../mz_core/server/orgs/service.lua')
+local coreService = read(root .. '/server/domain/service.lua')
 expect('core valida ped no servidor', coreService:find('GetPlayerPed', 1, true) ~= nil)
 expect('core valida coordenadas no servidor', coreService:find('GetEntityCoords', 1, true) ~= nil)
 expect('core exige membership ativo', coreService:find('getActivePlayerMembership', 1, true) ~= nil)
 expect('core possui contrato self-duty dedicado', coreService:find('setSelfDutyAtPoint', 1, true) ~= nil)
 
-local repository = read(root .. '/../mz_core/server/orgs/repository.lua')
+local repository = read(root .. '/server/domain/repository.lua')
 expect('duty e log usam transacao', repository:find('setMembershipDutyWithAudit', 1, true) ~= nil
   and repository:find('MySQL.transaction.await', 1, true) ~= nil)
 expect('transacao possui precondicao fail-closed', repository:find("data.action .. '.precondition_failed'", 1, true) ~= nil)
 expect('transacao possui assercao fail-closed', repository:find("data.action .. '.assertion_failed'", 1, true) ~= nil)
 
-local exportsFile = read(root .. '/../mz_core/server/orgs/exports.lua')
+local exportsFile = read(root .. '/server/domain/exports.lua')
 expect('export self-duty explicito existe', exportsFile:find("exports('SetSelfOrgDutyAtPoint'", 1, true) ~= nil)
 expect('export administrativo antigo foi preservado', exportsFile:find("exports('SetOrgMemberDuty'", 1, true) ~= nil)
 
@@ -177,7 +177,7 @@ IsPlayerAceAllowed = function() return false end
 TriggerClientEvent = function() end
 TriggerEvent = function() end
 
-dofile(root .. '/../mz_core/server/orgs/service.lua')
+dofile(root .. '/server/domain/service.lua')
 
 ok, sanitized = MZOrgService.setSelfDutyAtPoint(11, 'alpha', true)
 expect('self-duty valido chega a transacao', ok == true and runtime.transactionCalls == 1

@@ -773,13 +773,6 @@ Formato seguro esperado:
         "org.view"
       }
     }
-  },
-  playerOverrides = {
-    {
-      permission = "staff.panel.open",
-      allow = true,
-      expiresAt = nil
-    }
   }
 }
 ```
@@ -788,7 +781,6 @@ Origem real no `mz_core`:
 
 - `mz_org_grades`: `level`, `code`, `name`, `salary`, `inherits_grade_id`, `active`.
 - `mz_org_permissions`: capabilities base quando `grade_id` e nulo, e capabilities de grade quando `grade_id` aponta para uma grade.
-- `mz_player_permissions`: overrides globais do player atual, retornados sem identifiers privados.
 
 Permissao server-side:
 
@@ -1162,7 +1154,7 @@ ListGlobalLogsSecure(source, filters)
 
 ## Regra global `staff.*`
 
-- `HasGlobalPermission`: owner ACE, ACE explicito ou override global explicito;
+- `HasGlobalPermission`: owner ACE, ACE explicito ou permissao do cargo Staff ativo;
 - `HasPermission` nao resolve `staff.*`;
 - `CanOrg` rejeita `staff.*`;
 - cargos, base permissions, heranca, access model e seeds organizacionais ignoram/rejeitam `staff.*`;

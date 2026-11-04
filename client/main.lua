@@ -41,18 +41,18 @@ local function closePanel()
 end
 
 RegisterCommand(Config.Commands.Dev, function()
-  if MZOrgMenuRouter.CanUseLegacy() then
+  if Config.DebugCommands == true and MZOrgMenuRouter.CanUseNui() then
     openPanel('dashboard', 'hub')
   else
-    MZOrgMenuCommon.Notify('Painel legado desativado.', 'error')
+    MZOrgMenuCommon.Notify('Comando de desenvolvimento desativado.', 'error')
   end
 end, false)
 
 RegisterCommand(Config.Commands.Main, function()
   if MZOrgMenuRouter.ShouldUseOrganizationMenu() then
-    MZOrgMenuRouter.OpenOrganizations(nil, Config.Commands.Main)
-  elseif MZOrgMenuRouter.CanUseLegacy() then
-    openPanel('dashboard', 'hub')
+    MZOrgMenuRouter.OpenOrganizations('job', Config.Commands.Main)
+  elseif MZOrgMenuRouter.CanUseNui() then
+    openPanel('legal', 'legal')
   else
     MZOrgMenuCommon.Notify('Interface organizacional desativada.', 'error')
   end
@@ -60,8 +60,8 @@ end, false)
 
 RegisterCommand(Config.Commands.Org, function()
   if MZOrgMenuRouter.ShouldUseOrganizationMenu() then
-    MZOrgMenuRouter.OpenOrganizations(nil, Config.Commands.Org)
-  elseif MZOrgMenuRouter.CanUseLegacy() then
+    MZOrgMenuRouter.OpenOrganizations('job', Config.Commands.Org)
+  elseif MZOrgMenuRouter.CanUseNui() then
     openPanel('legal', 'legal')
   else
     MZOrgMenuCommon.Notify('Interface organizacional desativada.', 'error')
@@ -71,7 +71,7 @@ end, false)
 RegisterCommand(Config.Commands.Gang, function()
   if MZOrgMenuRouter.ShouldUseOrganizationMenu() then
     MZOrgMenuRouter.OpenOrganizations('gang', Config.Commands.Gang)
-  elseif MZOrgMenuRouter.CanUseLegacy() then
+  elseif MZOrgMenuRouter.CanUseNui() then
     openPanel('gang', 'illegal')
   else
     MZOrgMenuCommon.Notify('Nenhuma interface disponivel.', 'error')
@@ -81,25 +81,31 @@ end, false)
 local staffMenuCommand = (Config.MenuArchitecture or {}).staffCommand or 'stafforg'
 if staffMenuCommand ~= Config.Commands.Staff then
   RegisterCommand(staffMenuCommand, function()
-    MZOrgStaffMenu.Open()
+    if MZOrgMenuRouter.CanUseNui() then
+      openPanel('staff', 'staff')
+    elseif MZOrgMenuRouter.ShouldUseStaffMenu() then
+      MZOrgStaffMenu.Open()
+    else
+      MZOrgMenuCommon.Notify('Interface Staff desativada.', 'error')
+    end
   end, false)
 end
 
 RegisterCommand(Config.Commands.Staff, function()
   local architecture = type(Config.MenuArchitecture) == 'table' and Config.MenuArchitecture or {}
-  if staffMenuCommand == Config.Commands.Staff or architecture.staffAliasCommandEnabled == true then
-    MZOrgStaffMenu.Open()
-  elseif architecture.legacyStaffCommandEnabled == true and MZOrgMenuRouter.CanUseLegacy() then
+  if MZOrgMenuRouter.CanUseNui() then
     openPanel('staff', 'staff')
+  elseif MZOrgMenuRouter.ShouldUseStaffMenu() and (staffMenuCommand == Config.Commands.Staff or architecture.staffAliasCommandEnabled == true) then
+    MZOrgStaffMenu.Open()
   else
-    MZOrgMenuCommon.Notify('Comando Staff legado desativado. Use /' .. tostring(architecture.staffCommand or 'stafforg') .. '.', 'error')
+    MZOrgMenuCommon.Notify('Interface Staff desativada.', 'error')
   end
 end, false)
 
 RegisterCommand(Config.Commands.Vip, function()
   if MZOrgMenuRouter.ShouldUseOrganizationMenu() then
     MZOrgMenuRouter.OpenOrganizations('vip', Config.Commands.Vip)
-  elseif MZOrgMenuRouter.CanUseLegacy() then
+  elseif MZOrgMenuRouter.CanUseNui() then
     openPanel('vip', 'vip')
   else
     MZOrgMenuCommon.Notify('Nenhuma interface disponivel.', 'error')
@@ -109,7 +115,7 @@ end, false)
 RegisterCommand(Config.Commands.Business, function()
   if MZOrgMenuRouter.ShouldUseOrganizationMenu() then
     MZOrgMenuRouter.OpenOrganizations('business', Config.Commands.Business)
-  elseif MZOrgMenuRouter.CanUseLegacy() then
+  elseif MZOrgMenuRouter.CanUseNui() then
     openPanel('business', 'business')
   else
     MZOrgMenuCommon.Notify('Nenhuma interface disponivel.', 'error')
@@ -119,7 +125,7 @@ end, false)
 RegisterCommand(Config.Commands.Government, function()
   if MZOrgMenuRouter.ShouldUseOrganizationMenu() then
     MZOrgMenuRouter.OpenOrganizations('government', Config.Commands.Government)
-  elseif MZOrgMenuRouter.CanUseLegacy() then
+  elseif MZOrgMenuRouter.CanUseNui() then
     openPanel('government', 'government')
   else
     MZOrgMenuCommon.Notify('Nenhuma interface disponivel.', 'error')
@@ -129,7 +135,7 @@ end, false)
 RegisterCommand(Config.Commands.Event, function()
   if MZOrgMenuRouter.ShouldUseOrganizationMenu() then
     MZOrgMenuRouter.OpenOrganizations('event', Config.Commands.Event)
-  elseif MZOrgMenuRouter.CanUseLegacy() then
+  elseif MZOrgMenuRouter.CanUseNui() then
     openPanel('event', 'event')
   else
     MZOrgMenuCommon.Notify('Nenhuma interface disponivel.', 'error')
@@ -294,4 +300,10 @@ RegisterNetEvent('mz_org:client:organizationInvalidated', function(change)
     MZOrgMenuCommon.CloseContext()
     MZOrgMenuCommon.Notify('A organizacao foi alterada. Reabra o menu para carregar a revisao atual.', 'warning')
   end
+end)
+
+AddEventHandler('onClientResourceStop', function(resourceName)
+  if resourceName ~= GetCurrentResourceName() then return end
+  isOpen = false
+  SetNuiFocus(false, false)
 end)

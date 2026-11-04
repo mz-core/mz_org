@@ -212,7 +212,7 @@
       { id: 1, level: 1, code: 'recruta', name: 'Recruta', salary: 0, priority: 1, active: true, capabilities: ['org.view'], directCapabilities: ['org.view'] },
       { id: 2, level: 2, code: 'membro', name: 'Membro', salary: 0, priority: 2, active: true, capabilities: ['org.view', 'members.invite'], directCapabilities: ['members.invite'] },
       { id: 3, level: 3, code: 'lider', name: 'Lider', salary: 0, priority: 3, active: true, capabilities: ['org.view', 'members.invite', 'manage.members'], directCapabilities: ['manage.members'] }
-    ], playerOverrides: [] } });
+    ] } });
     return Promise.resolve({ ok: true });
   }
 

@@ -189,7 +189,7 @@ RegisterNetEvent('mz_org:server:listGoals', function(requestId, payload)
     return
   end
 
-  local rows = safeExport('mz_core', 'ListOrgGoals', src, filters)
+  local rows = safeExport('mz_org', 'ListOrgGoals', src, filters)
   if rows == false then
     sendResponse(src, requestId, fail('Nao foi possivel listar metas.'))
     return
@@ -227,7 +227,7 @@ RegisterNetEvent('mz_org:server:getGoal', function(requestId, payload)
     return
   end
 
-  local row = safeExport('mz_core', 'GetOrgGoal', src, id)
+  local row = safeExport('mz_org', 'GetOrgGoal', src, id)
   local item = normalizeGoalRow(row)
   if not item then
     debugPrint('GetOrgGoal indisponivel; retornando detalhe vazio seguro.')
@@ -272,7 +272,7 @@ RegisterNetEvent('mz_org:server:createGoal', function(requestId, payload)
     return
   end
 
-  local result, dataOrErr = safeExport('mz_core', 'CreateOrgGoal', src, orgCode, data)
+  local result, dataOrErr = safeExport('mz_org', 'CreateOrgGoal', src, orgCode, data)
   if result ~= true then
     local message = 'Nao foi possivel criar a meta.'
     if dataOrErr == 'invalid_org' or dataOrErr == 'org_not_found' then message = 'Organizacao invalida.' end

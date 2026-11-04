@@ -3,19 +3,23 @@ game 'gta5'
 
 name 'mz_org'
 author 'Mazus'
-description 'Painel NUI modular de organizações para MZ_CORE'
+description 'Canonical Organization domain and modular organization panel'
 version '0.1.0'
 
 lua54 'yes'
 
 dependencies {
+  'ox_lib',
   'mz_core',
+  'mz_economy',
+  'mz_vehicles',
   'mz_menu',
   'mz_interact',
   'oxmysql'
 }
 
 shared_scripts {
+  '@ox_lib/init.lua',
   'shared/config.lua',
   'shared/context.lua',
   'shared/capabilities.lua',
@@ -53,8 +57,22 @@ client_scripts {
 
 server_scripts {
   '@oxmysql/lib/MySQL.lua',
+  'server/domain/core_adapter.lua',
+  'server/domain/default_orgs.lua',
+  'server/domain/schema.lua',
+  'server/domain/repository.lua',
+  'server/domain/service.lua',
+  'server/domain/staff_mutation_repository.lua',
+  'server/domain/staff_mutations.lua',
+  'server/domain/exports.lua',
+  'server/domain/events.lua',
+  'server/domain/commands.lua',
+  'server/domain/runtime_probe.lua',
   'server/main.lua',
   'server/security.lua',
+  'server/account_bridge.lua',
+  'server/vehicle_bridge.lua',
+  'server/payroll.lua',
   'server/session.lua',
   'server/menu_staff.lua',
   'server/menu_staff_mutations.lua',
@@ -72,14 +90,9 @@ server_scripts {
   'server/logs.lua'
 }
 
-ui_page 'web/index.html'
+ui_page 'web/dist/index.html'
 
 files {
-  'web/index.html',
-  'web/style.css',
-  'web/script.js',
-  'web/core/**/*.js',
-  'web/services/**/*.js',
-  'web/panels/**/*.js',
-  'web/assets/**/*'
+  'web/dist/index.html',
+  'web/dist/assets/*'
 }

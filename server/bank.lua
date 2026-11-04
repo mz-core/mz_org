@@ -135,7 +135,7 @@ RegisterNetEvent('mz_org:server:getOrgBank', function(requestId, payload)
     return
   end
 
-  local okResult, result = safeExport('mz_core', 'GetOrgAccount', src, orgCode)
+  local okResult, result = safeExport('mz_org', 'GetOrgAccount', src, orgCode)
   if okResult == false then
     local message = 'Nao foi possivel carregar o banco da organizacao.'
     if result == 'forbidden' then message = 'Sem permissao para visualizar o banco.' end
@@ -147,7 +147,7 @@ RegisterNetEvent('mz_org:server:getOrgBank', function(requestId, payload)
 
   local account = normalizeBankAccount(result)
   if not account then
-    debugPrint('GetOrgAccount indisponivel ou falhou no mz_core.')
+    debugPrint('GetOrgAccount indisponivel ou falhou no mz_org.')
     sendResponse(src, requestId, fail('Banco da organizacao indisponivel.'))
     return
   end
@@ -166,14 +166,14 @@ RegisterNetEvent('mz_org:server:listOrgBankTransactions', function(requestId, pa
 
   -- Ainda nao existe tabela/export dedicado de extrato no mz_core.
   -- Mantemos a consulta read-only com fallback vazio seguro.
-  local okResult, result = safeExport('mz_core', 'ListOrgAccountTransactions', src, orgCode, normalizeTransactionFilters(payload))
+  local okResult, result = safeExport('mz_org', 'ListOrgAccountTransactions', src, orgCode, normalizeTransactionFilters(payload))
   if okResult == false then
     sendResponse(src, requestId, fail(translateBankError(result)))
     return
   end
 
   if type(result) ~= 'table' then
-    debugPrint('ListOrgAccountTransactions indisponivel no mz_core; retornando extrato vazio seguro.')
+    debugPrint('ListOrgAccountTransactions indisponivel no mz_org; retornando extrato vazio seguro.')
     sendResponse(src, requestId, ok({}))
     return
   end
@@ -203,7 +203,7 @@ RegisterNetEvent('mz_org:server:depositOrgBank', function(requestId, payload)
     return
   end
 
-  local okResult, result = safeExport('mz_core', 'DepositOrgAccount', src, orgCode, amount, reason)
+  local okResult, result = safeExport('mz_org', 'DepositOrgAccount', src, orgCode, amount, reason)
   if okResult == false then
     sendResponse(src, requestId, fail(translateBankError(result)))
     return
@@ -238,7 +238,7 @@ RegisterNetEvent('mz_org:server:withdrawOrgBank', function(requestId, payload)
     return
   end
 
-  local okResult, result = safeExport('mz_core', 'WithdrawOrgAccount', src, orgCode, amount, reason)
+  local okResult, result = safeExport('mz_org', 'WithdrawOrgAccount', src, orgCode, amount, reason)
   if okResult == false then
     sendResponse(src, requestId, fail(translateBankError(result)))
     return

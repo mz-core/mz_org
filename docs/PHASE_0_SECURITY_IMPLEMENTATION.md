@@ -15,7 +15,7 @@ Status: codigo e harnesses estaticos concluidos. Runtime FiveM nao aprovado.
 
 ### Permissoes
 
-- `HasGlobalPermission` no core agora usa somente owner, ACE explicito ou override global em `mz_player_permissions`.
+- `HasGlobalPermission` no core usa somente owner, ACE explicito ou permissao do cargo Staff ativo.
 - `HasPermission` retorna falso para `staff.*` e nao e usado pela sessao global.
 - `CanOrg` retorna falso para qualquer capability `staff.*`.
 - Allowlist de cargo e catalogo compartilhado nao contem `staff.*`.

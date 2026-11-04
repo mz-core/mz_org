@@ -101,8 +101,7 @@ local function normalizeAccessModel(row)
     orgName = tostring(row.orgName or row.org_name or row.name or ''),
     type = tostring(row.type or ''),
     baseCapabilities = normalizeList(row.baseCapabilities or row.base_capabilities),
-    grades = grades,
-    playerOverrides = type(row.playerOverrides or row.player_overrides) == 'table' and (row.playerOverrides or row.player_overrides) or {}
+    grades = grades
   }
 end
 
@@ -115,7 +114,7 @@ RegisterNetEvent('mz_org:server:getOrgAccess', function(requestId, payload)
     return
   end
 
-  local result, err = safeExport('mz_core', 'GetOrgAccessModel', src, orgCode)
+  local result, err = safeExport('mz_org', 'GetOrgAccessModel', src, orgCode)
   if result == false then
     sendResponse(src, requestId, fail(err == 'forbidden' and 'Sem permissao para visualizar cargos.' or 'Nao foi possivel carregar cargos.'))
     return
@@ -123,14 +122,13 @@ RegisterNetEvent('mz_org:server:getOrgAccess', function(requestId, payload)
 
   local model = normalizeAccessModel(result)
   if not model then
-    debugPrint('GetOrgAccessModel indisponivel ou falhou no mz_core; retornando modelo vazio seguro.')
+    debugPrint('GetOrgAccessModel indisponivel ou falhou no mz_org; retornando modelo vazio seguro.')
     sendResponse(src, requestId, ok({
       orgCode = orgCode,
       orgName = orgCode,
       type = '',
       baseCapabilities = {},
-      grades = {},
-      playerOverrides = {}
+      grades = {}
     }))
     return
   end

@@ -271,10 +271,10 @@ local function canUpdateOrgBasic(src)
 end
 
 local function getPlayerContext(src)
-  local context = safeExport('mz_core', 'GetPlayerOrgContext', src)
+  local context = safeExport('mz_org', 'GetPlayerOrgContext', src)
   if type(context) == 'table' then return context end
 
-  context = safeExport('mz_core', 'GetPlayerOrgs', src)
+  context = safeExport('mz_org', 'GetPlayerOrgs', src)
   if type(context) == 'table' then return context end
 
   return {}
@@ -287,7 +287,7 @@ local function listVisibleOrgs(src)
   local rows = nil
 
   if canSeeAll then
-    rows = safeExport('mz_core', 'ListOrgs')
+    rows = safeExport('mz_org', 'ListOrgs')
   else
     rows = context
   end
@@ -327,7 +327,7 @@ RegisterNetEvent('mz_org:server:getOrg', function(requestId, payload)
     return
   end
 
-  local row = safeExport('mz_core', 'GetOrgByCode', orgCode)
+  local row = safeExport('mz_org', 'GetOrgByCode', orgCode)
   if not row then
     sendResponse(src, requestId, fail('Organizacao nao encontrada.'))
     return
@@ -371,7 +371,7 @@ RegisterNetEvent('mz_org:server:createOrgFromTemplate', function(requestId, payl
     return
   end
 
-  local result, dataOrErr = safeExport('mz_core', 'CreateOrgFromTemplate', src, {
+  local result, dataOrErr = safeExport('mz_org', 'CreateOrgFromTemplate', src, {
     type = orgType,
     code = code,
     name = name,
@@ -434,7 +434,7 @@ RegisterNetEvent('mz_org:server:updateOrgBasic', function(requestId, payload)
     return
   end
 
-  local result, dataOrErr = safeExport('mz_core', 'UpdateOrgBasicInfo', src, orgCode, {
+  local result, dataOrErr = safeExport('mz_org', 'UpdateOrgBasicInfo', src, orgCode, {
     name = name,
     status = status,
     hasSalary = asBool(payload.hasSalary),
@@ -545,7 +545,7 @@ RegisterNetEvent('mz_org:server:createGrade', function(requestId, payload)
   if not canUpdateOrgBasic(src) then sendResponse(src, requestId, fail('Voce nao tem permissao para gerenciar cargos.')) return end
   if rateLimited(GradeActionRateLimit, src) then sendResponse(src, requestId, fail('Aguarde alguns segundos e tente novamente.')) return end
 
-  local result, dataOrErr = safeExport('mz_core', 'CreateOrgGrade', src, orgCode, {
+  local result, dataOrErr = safeExport('mz_org', 'CreateOrgGrade', src, orgCode, {
     code = code,
     name = name,
     level = level,
@@ -585,7 +585,7 @@ RegisterNetEvent('mz_org:server:updateGradeBasic', function(requestId, payload)
   if not canUpdateOrgBasic(src) then sendResponse(src, requestId, fail('Voce nao tem permissao para gerenciar cargos.')) return end
   if rateLimited(GradeActionRateLimit, src) then sendResponse(src, requestId, fail('Aguarde alguns segundos e tente novamente.')) return end
 
-  local result, dataOrErr = safeExport('mz_core', 'UpdateOrgGradeBasic', src, orgCode, gradeId, {
+  local result, dataOrErr = safeExport('mz_org', 'UpdateOrgGradeBasic', src, orgCode, gradeId, {
     name = name,
     level = level,
     salary = salary,
@@ -613,7 +613,7 @@ RegisterNetEvent('mz_org:server:archiveOrg', function(requestId, payload)
   if not canUpdateOrgBasic(src) then sendResponse(src, requestId, fail('Voce nao tem permissao para arquivar esta organizacao.')) return end
   if rateLimited(ArchiveActionRateLimit, src) then sendResponse(src, requestId, fail('Aguarde alguns segundos e tente novamente.')) return end
 
-  local result, dataOrErr = safeExport('mz_core', 'ArchiveOrg', src, orgCode, reason)
+  local result, dataOrErr = safeExport('mz_org', 'ArchiveOrg', src, orgCode, reason)
   if result ~= true then
     sendResponse(src, requestId, fail(archiveErrorMessage(dataOrErr)))
     return
@@ -633,7 +633,7 @@ RegisterNetEvent('mz_org:server:reactivateOrg', function(requestId, payload)
   if not canUpdateOrgBasic(src) then sendResponse(src, requestId, fail('Voce nao tem permissao para reativar esta organizacao.')) return end
   if rateLimited(ArchiveActionRateLimit, src) then sendResponse(src, requestId, fail('Aguarde alguns segundos e tente novamente.')) return end
 
-  local result, dataOrErr = safeExport('mz_core', 'ReactivateOrg', src, orgCode, reason)
+  local result, dataOrErr = safeExport('mz_org', 'ReactivateOrg', src, orgCode, reason)
   if result ~= true then
     sendResponse(src, requestId, fail(archiveErrorMessage(dataOrErr)))
     return
@@ -655,7 +655,7 @@ RegisterNetEvent('mz_org:server:disableGrade', function(requestId, payload)
   if not canUpdateOrgBasic(src) then sendResponse(src, requestId, fail('Voce nao tem permissao para gerenciar cargos.')) return end
   if rateLimited(GradeActionRateLimit, src) then sendResponse(src, requestId, fail('Aguarde alguns segundos e tente novamente.')) return end
 
-  local result, dataOrErr = safeExport('mz_core', 'DisableOrgGrade', src, orgCode, gradeId, reason)
+  local result, dataOrErr = safeExport('mz_org', 'DisableOrgGrade', src, orgCode, gradeId, reason)
   if result ~= true then
     sendResponse(src, requestId, fail(gradeErrorMessage(dataOrErr)))
     return
@@ -677,7 +677,7 @@ RegisterNetEvent('mz_org:server:reactivateGrade', function(requestId, payload)
   if not canUpdateOrgBasic(src) then sendResponse(src, requestId, fail('Voce nao tem permissao para gerenciar cargos.')) return end
   if rateLimited(GradeActionRateLimit, src) then sendResponse(src, requestId, fail('Aguarde alguns segundos e tente novamente.')) return end
 
-  local result, dataOrErr = safeExport('mz_core', 'ReactivateOrgGrade', src, orgCode, gradeId, reason)
+  local result, dataOrErr = safeExport('mz_org', 'ReactivateOrgGrade', src, orgCode, gradeId, reason)
   if result ~= true then
     sendResponse(src, requestId, fail(gradeErrorMessage(dataOrErr)))
     return
@@ -701,7 +701,7 @@ RegisterNetEvent('mz_org:server:addGradePermission', function(requestId, payload
   if not canUpdateOrgBasic(src) then sendResponse(src, requestId, fail('Voce nao tem permissao para gerenciar permissoes.')) return end
   if rateLimited(GradeActionRateLimit, src) then sendResponse(src, requestId, fail('Aguarde alguns segundos e tente novamente.')) return end
 
-  local result, dataOrErr = safeExport('mz_core', 'AddOrgGradePermission', src, orgCode, gradeId, permission, reason)
+  local result, dataOrErr = safeExport('mz_org', 'AddOrgGradePermission', src, orgCode, gradeId, permission, reason)
   if result ~= true then
     sendResponse(src, requestId, fail(gradePermissionErrorMessage(dataOrErr)))
     return
@@ -725,7 +725,7 @@ RegisterNetEvent('mz_org:server:removeGradePermission', function(requestId, payl
   if not canUpdateOrgBasic(src) then sendResponse(src, requestId, fail('Voce nao tem permissao para gerenciar permissoes.')) return end
   if rateLimited(GradeActionRateLimit, src) then sendResponse(src, requestId, fail('Aguarde alguns segundos e tente novamente.')) return end
 
-  local result, dataOrErr = safeExport('mz_core', 'RemoveOrgGradePermission', src, orgCode, gradeId, permission, reason)
+  local result, dataOrErr = safeExport('mz_org', 'RemoveOrgGradePermission', src, orgCode, gradeId, permission, reason)
   if result ~= true then
     sendResponse(src, requestId, fail(gradePermissionErrorMessage(dataOrErr)))
     return

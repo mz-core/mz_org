@@ -173,14 +173,14 @@ RegisterNetEvent('mz_org:server:listMembers', function(requestId, payload)
     return
   end
 
-  local rows, err = safeExport('mz_core', 'ListOrgMembers', src, orgCode)
+  local rows, err = safeExport('mz_org', 'ListOrgMembers', src, orgCode)
   if rows == false then
     sendResponse(src, requestId, fail(err == 'forbidden' and 'Sem permissao.' or 'Nao foi possivel listar membros.'))
     return
   end
 
   if type(rows) ~= 'table' then
-    debugPrint('ListOrgMembers indisponivel ou falhou no mz_core; leitura negada.')
+    debugPrint('ListOrgMembers indisponivel ou falhou no mz_org; leitura negada.')
     sendResponse(src, requestId, fail('Nao foi possivel listar membros.'))
     return
   end
@@ -234,9 +234,9 @@ RegisterNetEvent('mz_org:server:inviteMember', function(requestId, payload)
 
   local result, dataOrErr = nil, nil
   if citizenid then
-    result, dataOrErr = safeExport('mz_core', 'InviteOrgMemberByCitizenId', src, orgCode, citizenid, options)
+    result, dataOrErr = safeExport('mz_org', 'InviteOrgMemberByCitizenId', src, orgCode, citizenid, options)
   elseif Config and Config.AllowLegacyTargetSourceInvite == true then
-    result, dataOrErr = safeExport('mz_core', 'InviteOrgMember', src, orgCode, targetId, options)
+    result, dataOrErr = safeExport('mz_org', 'InviteOrgMember', src, orgCode, targetId, options)
   else
     sendResponse(src, requestId, fail('CitizenID do player alvo invalido.'))
     return
@@ -281,7 +281,7 @@ RegisterNetEvent('mz_org:server:removeMember', function(requestId, payload)
     return
   end
 
-  local result, dataOrErr = safeExport('mz_core', 'RemoveOrgMember', src, orgCode, citizenid)
+  local result, dataOrErr = safeExport('mz_org', 'RemoveOrgMember', src, orgCode, citizenid)
   if result ~= true then
     local message = 'Nao foi possivel remover o membro.'
     if dataOrErr == 'invalid_target' then message = 'Membro alvo invalido.' end
@@ -327,7 +327,7 @@ local function memberGradeAction(src, requestId, payload, action)
   end
 
   local exportName = action == 'demote' and 'DemoteOrgMemberSecure' or 'PromoteOrgMemberSecure'
-  local result, dataOrErr = safeExport('mz_core', exportName, src, orgCode, citizenid, {
+  local result, dataOrErr = safeExport('mz_org', exportName, src, orgCode, citizenid, {
     reason = reason
   })
   if result ~= true then
@@ -412,7 +412,7 @@ RegisterNetEvent('mz_org:server:setOrgLeader', function(requestId, payload)
     return
   end
 
-  local result, dataOrErr = safeExport('mz_core', 'SetOrgLeaderByCitizenId', src, orgCode, citizenid, {
+  local result, dataOrErr = safeExport('mz_org', 'SetOrgLeaderByCitizenId', src, orgCode, citizenid, {
     reason = reason
   })
 
